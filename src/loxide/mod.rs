@@ -1,9 +1,10 @@
 use std::io::Write;
 
-use crate::loxide::scanner::Scanner;
+use self::scanner::Scanner;
 
 mod scanner;
 mod token;
+mod token_type;
 
 pub struct Loxide {
     had_error: bool,
