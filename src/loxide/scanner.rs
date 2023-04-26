@@ -50,7 +50,7 @@ impl Scanner {
         }
 
         // Add the EOF token
-        tokens.push(Token::new(TokenType::Eof, String::new(), None, self.line));
+        tokens.push(Token::new(TokenType::Eof, String::new(), self.line));
 
         if errors.is_empty() {
             Ok(tokens)
@@ -135,18 +135,10 @@ impl Scanner {
     }
 
     fn make_token(&mut self, token_type: TokenType) -> Result<Token, Error> {
-        self.make_token_literal(token_type, None)
-    }
-
-    fn make_token_literal(
-        &mut self,
-        token_type: TokenType,
-        literal: Option<String>,
-    ) -> Result<Token, Error> {
         let text = String::from_utf8(self.source[self.start..self.current].to_vec())
             .map_err(|_| Error::InvalidUtf8Char { line: self.line })?;
 
-        Ok(Token::new(token_type, text, literal, self.line))
+        Ok(Token::new(token_type, text, self.line))
     }
 
     fn match_char(&mut self, expected: u8) -> bool {
