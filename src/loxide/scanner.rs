@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use super::token::Token;
-use super::token_type::TokenType;
+use super::token_type::{TokenType, KEYWORDS};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -130,6 +130,9 @@ impl Scanner {
             // Number literals
             c if c.is_ascii_digit() => self.number().map(Some),
 
+            // Identifiers and keywords
+            c if c.is_ascii_alphabetic() || c == b'_' => self.identifier().map(Some),
+
             // Default, unknown character
             c => Err(Error::UnexpectedCharacter {
                 c: c as char,
@@ -215,5 +218,20 @@ impl Scanner {
 
         let value = self.substring(self.start, self.current)?.parse::<f64>()?;
         Ok(TokenType::Number(value))
+    }
+
+    fn identifier(&mut self) -> Result<TokenType, Error> {
+        // Seek to the end of the identifier
+        while self.peek().is_ascii_alphanumeric() || self.peek() == b'_' {
+            self.advance();
+        }
+
+        // Check if the identifier is a reserved keyword
+        let text = self.substring(self.start, self.current)?;
+        if let Some(token_type) = KEYWORDS.get(&text) {
+            Ok(token_type.to_owned())
+        } else {
+            Ok(TokenType::Identifier(text))
+        }
     }
 }
