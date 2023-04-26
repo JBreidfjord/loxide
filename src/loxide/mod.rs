@@ -4,9 +4,11 @@ use thiserror::Error;
 
 use self::scanner::Scanner;
 
+pub mod ast;
+pub mod ast_printer;
 mod scanner;
-mod token;
-mod token_type;
+pub mod token;
+pub mod token_type;
 
 #[derive(Debug, Error)]
 pub enum Error {
