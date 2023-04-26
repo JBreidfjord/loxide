@@ -1,4 +1,4 @@
-use loxide::Loxide;
+use loxide::{Error, Loxide};
 
 mod loxide;
 
@@ -6,8 +6,16 @@ fn main() {
     let args = std::env::args().collect::<Vec<String>>();
     let mut loxide = Loxide::new();
     match args.len() {
-        1 => loxide.run_repl(),
-        2 => loxide.run_file(args[0].clone()),
+        1 => loxide.run_repl().unwrap(),
+        2 => {
+            if let Err(e) = loxide.run_file(&args[0]) {
+                println!("{}", e);
+                std::process::exit(match e {
+                    Error::Io(_) => 74,
+                    _ => 65,
+                });
+            }
+        }
         _ => {
             println!("Usage: loxide [script]");
             std::process::exit(64);

@@ -1,42 +1,46 @@
 use std::io::Write;
 
+use thiserror::Error;
+
 use self::scanner::Scanner;
 
 mod scanner;
 mod token;
 mod token_type;
 
-pub struct Loxide {
-    had_error: bool,
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("{}Scanning failed, see errors above.", .0.iter().map(|e| format!("{}\n", e)).collect::<String>())]
+    Scanner(Vec<self::scanner::Error>),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
+
+pub struct Loxide;
 
 impl Loxide {
     pub fn new() -> Self {
-        Self { had_error: false }
+        Self
     }
 
-    fn run(&self, source: String) {
+    fn run(&self, source: Vec<u8>) -> Result<(), Error> {
         let mut scanner = Scanner::new(source);
-        let tokens = scanner.scan_tokens();
+        let tokens = scanner.scan_tokens().map_err(Error::Scanner)?;
 
         // For now, just print the tokens
         for token in tokens {
             println!("{:?}", token);
         }
+
+        Ok(())
     }
 
-    pub fn run_file(&self, path: String) {
-        let source = std::fs::read_to_string(path).expect("Failed to read file");
-        self.run(source);
-        if self.had_error {
-            std::process::exit(65);
-        }
+    pub fn run_file(&self, path: &str) -> Result<(), Error> {
+        let source = std::fs::read(path)?;
+        self.run(source)
     }
 
-    pub fn run_repl(&mut self) {
-        // Create a buffer to read input into
-        let mut buffer = String::new();
-
+    pub fn run_repl(&mut self) -> Result<(), Error> {
         // Create a reader to read input from stdin
         let stdin = std::io::stdin();
 
@@ -46,12 +50,11 @@ impl Loxide {
         loop {
             // Print the prompt
             print!("> ");
-            stdout.flush().expect("Failed to flush stdout");
+            stdout.flush()?;
 
             // Read a line from stdin
-            stdin
-                .read_line(&mut buffer)
-                .expect("Failed to read line from stdin");
+            let mut buffer = String::new();
+            stdin.read_line(&mut buffer)?;
 
             // If the buffer is empty, break
             if buffer.is_empty() {
@@ -60,23 +63,16 @@ impl Loxide {
             }
 
             // Run the line
-            self.run(buffer.clone());
-            self.had_error = false;
-
-            // Clear the buffer
-            buffer.clear();
+            match self.run(buffer.into_bytes()) {
+                // TODO: Print returned value if any
+                Ok(_) => {}
+                Err(e) => println!("{}", e),
+            }
 
             // Flush stdout
-            stdout.flush().expect("Failed to flush stdout");
+            stdout.flush()?;
         }
-    }
 
-    pub fn error(&mut self, line: usize, message: &str) {
-        self.report(line, "", message);
-    }
-
-    fn report(&mut self, line: usize, location: &str, message: &str) {
-        eprintln!("[line {}] Error {}: {}", line, location, message);
-        self.had_error = true;
+        Ok(())
     }
 }
