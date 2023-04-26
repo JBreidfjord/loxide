@@ -29,7 +29,7 @@ impl Loxide {
 
         // For now, just print the tokens
         for token in tokens {
-            println!("{:?}", token);
+            println!("{}", token);
         }
 
         Ok(())

@@ -21,11 +21,10 @@ impl Token {
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let literal = match &self.token_type {
-            TokenType::String(s) | TokenType::Identifier(s) => s.to_owned(),
-            TokenType::Number(n) => n.to_string(),
-            _ => String::new(),
-        };
-        write!(f, "{:?} {} {}", self.token_type, self.lexeme, literal)
+        write!(
+            f,
+            "Type: {:?} | Lexeme: {} | Line: {}",
+            self.token_type, self.lexeme, self.line
+        )
     }
 }

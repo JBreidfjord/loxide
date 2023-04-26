@@ -13,6 +13,9 @@ pub enum Error {
 
     #[error("[line {line}] Unterminated string")]
     UnterminatedString { line: usize },
+
+    #[error(transparent)]
+    NumberParse(#[from] std::num::ParseFloatError),
 }
 
 pub struct Scanner {
@@ -121,6 +124,12 @@ impl Scanner {
                 Ok(None)
             }
 
+            // String literals
+            b'"' => self.string().map(Some),
+
+            // Number literals
+            c if c.is_ascii_digit() => self.number().map(Some),
+
             // Default, unknown character
             c => Err(Error::UnexpectedCharacter {
                 c: c as char,
@@ -135,9 +144,7 @@ impl Scanner {
     }
 
     fn make_token(&mut self, token_type: TokenType) -> Result<Token, Error> {
-        let text = String::from_utf8(self.source[self.start..self.current].to_vec())
-            .map_err(|_| Error::InvalidUtf8Char { line: self.line })?;
-
+        let text = self.substring(self.start, self.current)?;
         Ok(Token::new(token_type, text, self.line))
     }
 
@@ -154,5 +161,59 @@ impl Scanner {
             return b'\0';
         }
         self.source[self.current]
+    }
+
+    fn peek_next(&self) -> u8 {
+        if self.current + 1 >= self.source.len() {
+            return b'\0';
+        }
+        self.source[self.current + 1]
+    }
+
+    fn substring(&self, start: usize, end: usize) -> Result<String, Error> {
+        String::from_utf8(self.source[start..end].to_vec())
+            .map_err(|_| Error::InvalidUtf8Char { line: self.line })
+    }
+
+    fn string(&mut self) -> Result<TokenType, Error> {
+        // Seek to the end of the string
+        while self.peek() != b'"' && !self.is_at_end() {
+            if self.peek() == b'\n' {
+                self.line += 1;
+            }
+            self.advance();
+        }
+
+        if self.is_at_end() {
+            return Err(Error::UnterminatedString { line: self.line });
+        }
+
+        // Consume the closing quote
+        self.advance();
+
+        // Trim the surrounding quotes
+        let value = self.substring(self.start + 1, self.current - 1)?;
+        Ok(TokenType::String(value))
+    }
+
+    fn number(&mut self) -> Result<TokenType, Error> {
+        // Seek to the end of the number
+        while self.peek().is_ascii_digit() {
+            self.advance();
+        }
+
+        // Look for a fractional part
+        if self.peek() == b'.' && self.peek_next().is_ascii_digit() {
+            // Consume the "."
+            self.advance();
+
+            // Seek to the end of the fractional part
+            while self.peek().is_ascii_digit() {
+                self.advance();
+            }
+        }
+
+        let value = self.substring(self.start, self.current)?.parse::<f64>()?;
+        Ok(TokenType::Number(value))
     }
 }
