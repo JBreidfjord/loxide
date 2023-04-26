@@ -65,6 +65,7 @@ impl Scanner {
 
     fn scan_token(&mut self) -> Result<Option<TokenType>, Error> {
         match self.advance() {
+            // Single character tokens
             b'(' => Ok(Some(TokenType::LeftParen)),
             b')' => Ok(Some(TokenType::RightParen)),
             b'{' => Ok(Some(TokenType::LeftBrace)),
@@ -75,6 +76,52 @@ impl Scanner {
             b'+' => Ok(Some(TokenType::Plus)),
             b';' => Ok(Some(TokenType::Semicolon)),
             b'*' => Ok(Some(TokenType::Star)),
+
+            // One or two character operators
+            b'!' => Ok(Some(if self.match_char(b'=') {
+                TokenType::BangEqual
+            } else {
+                TokenType::Bang
+            })),
+
+            b'=' => Ok(Some(if self.match_char(b'=') {
+                TokenType::EqualEqual
+            } else {
+                TokenType::Equal
+            })),
+
+            b'<' => Ok(Some(if self.match_char(b'=') {
+                TokenType::LessEqual
+            } else {
+                TokenType::Less
+            })),
+
+            b'>' => Ok(Some(if self.match_char(b'=') {
+                TokenType::GreaterEqual
+            } else {
+                TokenType::Greater
+            })),
+
+            b'/' => {
+                if self.match_char(b'/') {
+                    // A comment goes until the end of the line
+                    while self.peek() != b'\n' && !self.is_at_end() {
+                        self.advance();
+                    }
+                    Ok(None)
+                } else {
+                    Ok(Some(TokenType::Slash))
+                }
+            }
+
+            // Ignore whitespace
+            b' ' | b'\r' | b'\t' => Ok(None),
+            b'\n' => {
+                self.line += 1;
+                Ok(None)
+            }
+
+            // Default, unknown character
             c => Err(Error::UnexpectedCharacter {
                 c: c as char,
                 line: self.line,
@@ -100,5 +147,20 @@ impl Scanner {
             .map_err(|_| Error::InvalidUtf8Char { line: self.line })?;
 
         Ok(Token::new(token_type, text, literal, self.line))
+    }
+
+    fn match_char(&mut self, expected: u8) -> bool {
+        if self.is_at_end() || self.source[self.current] != expected {
+            return false;
+        }
+        self.current += 1;
+        true
+    }
+
+    fn peek(&self) -> u8 {
+        if self.is_at_end() {
+            return b'\0';
+        }
+        self.source[self.current]
     }
 }
