@@ -18,10 +18,6 @@ impl Token {
         }
     }
 
-    pub fn get_lexeme(&self) -> &str {
-        &self.lexeme
-    }
-
     pub fn get_token_type(&self) -> TokenType {
         self.token_type.to_owned()
     }

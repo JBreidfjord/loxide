@@ -4,13 +4,12 @@ use thiserror::Error;
 
 use self::{interpreter::Interpreter, parser::Parser, scanner::Scanner};
 
-pub mod ast;
-pub mod ast_printer;
+mod ast;
 mod interpreter;
 mod parser;
 mod scanner;
-pub mod token;
-pub mod token_type;
+mod token;
+mod token_type;
 
 #[derive(Debug, Error)]
 pub enum Error {
