@@ -126,7 +126,7 @@ impl Visitor<Result<ExprReturn>> for Interpreter {
                 Ok(expr_return)
             }
 
-            Expr::Grouping { expr } => self.visit_expr(expr),
+            Expr::Grouping(expr) => self.visit_expr(expr),
 
             Expr::Unary { operator, right } => {
                 let right = self.visit_expr(right)?;

@@ -22,7 +22,7 @@ impl Visitor<String> for AstPrinter {
                 self.visit_expr(left),
                 self.visit_expr(right),
             ),
-            Expr::Grouping { expr } => format!("(group {})", self.visit_expr(expr)),
+            Expr::Grouping(expr) => format!("(group {})", self.visit_expr(expr)),
             Expr::Literal(literal) => match literal {
                 Literal::Nil => String::from("nil"),
                 Literal::Bool(v) => v.to_string(),

@@ -8,9 +8,7 @@ pub enum Expr {
         operator: Token,
         right: Box<Expr>,
     },
-    Grouping {
-        expr: Box<Expr>,
-    },
+    Grouping(Box<Expr>),
     Literal(Literal),
     Unary {
         operator: Token,

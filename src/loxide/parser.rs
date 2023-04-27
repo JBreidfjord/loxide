@@ -126,9 +126,7 @@ impl Parser {
             TokenType::LeftParen => {
                 let expr = self.expression()?;
                 self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
-                Ok(Expr::Grouping {
-                    expr: Box::new(expr),
-                })
+                Ok(Expr::Grouping(Box::new(expr)))
             }
 
             _ => Err(Error::Parse {
