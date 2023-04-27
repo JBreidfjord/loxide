@@ -138,6 +138,7 @@ impl Parser {
         }
     }
 
+    #[allow(dead_code)]
     fn synchronize(&mut self) {
         self.advance();
 

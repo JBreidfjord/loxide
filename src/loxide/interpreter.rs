@@ -10,6 +10,7 @@ use super::{
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[allow(dead_code)]
     #[error("Error converting literal {literal}.")]
     LiteralConversion { literal: Literal },
 

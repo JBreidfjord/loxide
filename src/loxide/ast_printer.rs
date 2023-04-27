@@ -3,8 +3,9 @@ use super::ast::{Expr, Literal, Visitor};
 pub struct AstPrinter;
 
 impl AstPrinter {
-    pub fn visit_expr(&self, expr: &Expr) -> String {
-        Visitor::visit_expr(self, expr)
+    #[allow(dead_code)]
+    pub fn print(&self, expr: &Expr) -> String {
+        self.visit_expr(expr)
     }
 }
 
