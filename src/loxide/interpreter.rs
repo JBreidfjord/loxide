@@ -14,7 +14,7 @@ pub enum Error {
     LiteralConversion { literal: Literal },
 
     #[error(
-        "`{operator}` expected one of: [{}], found {} of type {}.",
+        "Operator `{operator}` expected one of: [{}], found {} of type {}.",
         .expected.join(", "),
         .found,
         .found.type_of()
@@ -104,6 +104,16 @@ impl fmt::Display for ExprReturn {
             Self::Number(n) => n.fmt(f),
             Self::String(s) => write!(f, "{:?}", s),
         }
+    }
+}
+
+impl Interpreter {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn interpret(&self, expr: &Expr) -> Result<ExprReturn> {
+        self.visit_expr(expr)
     }
 }
 

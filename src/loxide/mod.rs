@@ -2,7 +2,7 @@ use std::io::Write;
 
 use thiserror::Error;
 
-use self::{parser::Parser, scanner::Scanner};
+use self::{interpreter::Interpreter, parser::Parser, scanner::Scanner};
 
 pub mod ast;
 pub mod ast_printer;
@@ -16,17 +16,28 @@ pub mod token_type;
 pub enum Error {
     #[error("{}Scanning failed, see errors above.", .0.iter().map(|e| format!("{}\n", e)).collect::<String>())]
     Scanner(Vec<self::scanner::Error>),
+
+    #[error("{}Parsing failed, see errors above.", .0.iter().map(|e| format!("{}\n", e)).collect::<String>())]
+    Parser(Vec<self::parser::Error>),
+
+    #[error(transparent)]
+    Runtime(#[from] self::interpreter::Error),
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
-pub struct Loxide;
+pub struct Loxide {
+    interpreter: Interpreter,
+}
 
 impl Loxide {
     pub fn new() -> Self {
-        Self
+        Self {
+            interpreter: Interpreter::new(),
+        }
     }
 
     fn run(&self, source: Vec<u8>) -> Result {
@@ -34,9 +45,11 @@ impl Loxide {
         let tokens = scanner.scan_tokens().map_err(Error::Scanner)?;
 
         let mut parser = Parser::new(tokens);
-        let expr = parser.parse().unwrap();
+        let expr = parser.parse().map_err(Error::Parser)?;
 
-        println!("{}", ast_printer::AstPrinter.visit_expr(&expr));
+        let expr_return = self.interpreter.interpret(&expr).map_err(Error::Runtime)?;
+
+        println!("{}", expr_return);
 
         Ok(())
     }
@@ -70,7 +83,6 @@ impl Loxide {
 
             // Run the line
             match self.run(buffer.into_bytes()) {
-                // TODO: Print returned value if any
                 Ok(_) => {}
                 Err(e) => println!("{}", e),
             }

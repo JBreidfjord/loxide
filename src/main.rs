@@ -28,6 +28,7 @@ fn main() {
             if let Err(e) = loxide.run_file(&args[0]) {
                 println!("{}", e);
                 std::process::exit(match e {
+                    Error::Runtime(_) => 70,
                     Error::Io(_) => 74,
                     _ => 65,
                 });
