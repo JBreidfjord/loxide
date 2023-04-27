@@ -6,6 +6,7 @@ use self::{parser::Parser, scanner::Scanner};
 
 pub mod ast;
 pub mod ast_printer;
+mod interpreter;
 mod parser;
 mod scanner;
 pub mod token;
