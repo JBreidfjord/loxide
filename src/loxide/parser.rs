@@ -6,8 +6,6 @@ use super::{ast::Expr, token::Token, token_type::TokenType};
 pub enum Error {
     #[error("[line {line}] {msg}")]
     ParseError { msg: String, line: usize },
-    #[error("[line {line}] LHS missing for {operator}")]
-    LhsMissing { operator: String, line: usize },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
