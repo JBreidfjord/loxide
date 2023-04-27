@@ -2,10 +2,11 @@ use std::io::Write;
 
 use thiserror::Error;
 
-use self::scanner::Scanner;
+use self::{parser::Parser, scanner::Scanner};
 
 pub mod ast;
 pub mod ast_printer;
+mod parser;
 mod scanner;
 pub mod token;
 pub mod token_type;
@@ -18,6 +19,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
 }
 
+type Result<T = (), E = Error> = std::result::Result<T, E>;
+
 pub struct Loxide;
 
 impl Loxide {
@@ -25,24 +28,24 @@ impl Loxide {
         Self
     }
 
-    fn run(&self, source: Vec<u8>) -> Result<(), Error> {
+    fn run(&self, source: Vec<u8>) -> Result {
         let mut scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens().map_err(Error::Scanner)?;
 
-        // For now, just print the tokens
-        for token in tokens {
-            println!("{}", token);
-        }
+        let mut parser = Parser::new(tokens);
+        let expr = parser.parse().unwrap();
+
+        println!("{}", ast_printer::AstPrinter.visit_expr(&expr));
 
         Ok(())
     }
 
-    pub fn run_file(&self, path: &str) -> Result<(), Error> {
+    pub fn run_file(&self, path: &str) -> Result {
         let source = std::fs::read(path)?;
         self.run(source)
     }
 
-    pub fn run_repl(&mut self) -> Result<(), Error> {
+    pub fn run_repl(&mut self) -> Result {
         // Create a reader to read input from stdin
         let stdin = std::io::stdin();
 
