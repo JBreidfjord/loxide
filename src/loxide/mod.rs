@@ -47,9 +47,9 @@ impl Loxide {
         let mut parser = Parser::new(tokens);
         let expr = parser.parse().map_err(Error::Parser)?;
 
-        let expr_return = self.interpreter.interpret(&expr).map_err(Error::Runtime)?;
+        let value = self.interpreter.interpret(&expr).map_err(Error::Runtime)?;
 
-        println!("{}", expr_return);
+        println!("{}", value);
 
         Ok(())
     }

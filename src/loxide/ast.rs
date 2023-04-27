@@ -29,8 +29,9 @@ pub enum Literal {
     String(String),
 }
 
-pub trait Visitor<R> {
-    fn visit_expr(&self, expr: &Expr) -> R;
+pub trait Visitor<E, S> {
+    fn visit_expr(&self, expr: &Expr) -> E;
+    fn visit_stmt(&self, stmt: &Stmt) -> S;
 }
 
 impl fmt::Display for Literal {
