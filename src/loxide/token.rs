@@ -25,6 +25,10 @@ impl Token {
     pub fn get_line(&self) -> usize {
         self.line
     }
+
+    pub fn get_lexeme(&self) -> String {
+        self.lexeme.to_owned()
+    }
 }
 
 impl fmt::Display for Token {

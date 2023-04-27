@@ -5,6 +5,7 @@ use thiserror::Error;
 use self::{interpreter::Interpreter, parser::Parser, scanner::Scanner};
 
 mod ast;
+mod environment;
 mod interpreter;
 mod parser;
 mod scanner;
@@ -39,7 +40,7 @@ impl Loxide {
         }
     }
 
-    fn run(&self, source: Vec<u8>) -> Result {
+    fn run(&mut self, source: Vec<u8>) -> Result {
         let mut scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens().map_err(Error::Scanner)?;
 
@@ -51,7 +52,7 @@ impl Loxide {
             .map_err(Error::Runtime)
     }
 
-    pub fn run_file(&self, path: &str) -> Result {
+    pub fn run_file(&mut self, path: &str) -> Result {
         let source = std::fs::read(path)?;
         self.run(source)
     }

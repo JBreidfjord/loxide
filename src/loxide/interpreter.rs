@@ -4,6 +4,7 @@ use thiserror::Error;
 
 use super::{
     ast::{Expr, Literal, Stmt, Visitor},
+    environment::Environment,
     token::Token,
     token_type::TokenType,
 };
@@ -26,7 +27,7 @@ pub enum Error {
     UnsupportedUnary { operator: TokenType, value: Value },
 
     #[error(
-        "Unsupported binary operator `{operator}` on types {} and {}",
+        "Unsupported binary operator `{operator}` on types {} and {}.",
         .left.type_of(),
         .right.type_of()
     )]
@@ -35,11 +36,14 @@ pub enum Error {
         left: Value,
         right: Value,
     },
+
+    #[error("Undefined variable {name}.")]
+    UndefinedVariable { name: String },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Nil,
     Number(f64),
@@ -98,14 +102,18 @@ impl fmt::Display for Value {
     }
 }
 
-pub struct Interpreter;
+pub struct Interpreter {
+    environment: Environment,
+}
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self
+        Self {
+            environment: Environment::new(),
+        }
     }
 
-    pub fn interpret(&self, statements: &[Stmt]) -> Result<()> {
+    pub fn interpret(&mut self, statements: &[Stmt]) -> Result<()> {
         for stmt in statements {
             self.visit_stmt(stmt)?;
         }
@@ -114,13 +122,21 @@ impl Interpreter {
 }
 
 impl Visitor<Result<Value>, Result<()>> for Interpreter {
-    fn visit_stmt(&self, stmt: &Stmt) -> Result<()> {
+    fn visit_stmt(&mut self, stmt: &Stmt) -> Result<()> {
         match stmt {
             Stmt::Expression(expr) => {
                 self.visit_expr(expr)?;
             }
+
             Stmt::Print(expr) => println!("{}", self.visit_expr(expr)?),
-            Stmt::Var { name, initializer } => todo!(),
+
+            Stmt::Var { name, initializer } => {
+                let value = match initializer {
+                    Some(expr) => self.visit_expr(expr)?,
+                    None => Value::Nil,
+                };
+                self.environment.define(name.get_lexeme(), value)
+            }
         }
 
         Ok(())
@@ -232,7 +248,13 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 }
             }
 
-            Expr::Variable(_) => todo!(),
+            Expr::Variable(name) => {
+                self.environment
+                    .get(name.get_lexeme())
+                    .ok_or(Error::UndefinedVariable {
+                        name: name.get_lexeme(),
+                    })
+            }
         }
     }
 }

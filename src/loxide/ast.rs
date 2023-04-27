@@ -36,7 +36,7 @@ pub enum Literal {
 
 pub trait Visitor<E, S> {
     fn visit_expr(&self, expr: &Expr) -> E;
-    fn visit_stmt(&self, stmt: &Stmt) -> S;
+    fn visit_stmt(&mut self, stmt: &Stmt) -> S;
 }
 
 impl fmt::Display for Literal {
