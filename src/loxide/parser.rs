@@ -1,11 +1,15 @@
 use thiserror::Error;
 
-use super::{ast::Expr, token::Token, token_type::TokenType};
+use super::{
+    ast::{Expr, Literal},
+    token::Token,
+    token_type::TokenType,
+};
 
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("[line {line}] {msg}")]
-    ParseError { msg: String, line: usize },
+    Parse { msg: String, line: usize },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -20,8 +24,8 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> Option<Expr> {
-        self.expression().map_err(|e| eprintln!("{}", e)).ok()
+    pub fn parse(&mut self) -> Result<Expr, Vec<Error>> {
+        self.expression().map_err(|e| vec![e])
     }
 
     fn expression(&mut self) -> Result<Expr> {
@@ -113,11 +117,11 @@ impl Parser {
     fn primary(&mut self) -> Result<Expr> {
         let previous = self.advance();
         match previous.get_token_type() {
-            TokenType::False
-            | TokenType::True
-            | TokenType::Nil
-            | TokenType::Number(_)
-            | TokenType::String(_) => Ok(Expr::Literal { value: previous }),
+            TokenType::False => Ok(Expr::Literal(Literal::Bool(false))),
+            TokenType::True => Ok(Expr::Literal(Literal::Bool(true))),
+            TokenType::Nil => Ok(Expr::Literal(Literal::Nil)),
+            TokenType::Number(v) => Ok(Expr::Literal(Literal::Number(v))),
+            TokenType::String(v) => Ok(Expr::Literal(Literal::String(v))),
 
             TokenType::LeftParen => {
                 let expr = self.expression()?;
@@ -127,13 +131,14 @@ impl Parser {
                 })
             }
 
-            _ => Err(Error::ParseError {
+            _ => Err(Error::Parse {
                 msg: "Expect expression.".to_owned(),
                 line: previous.get_line(),
             }),
         }
     }
 
+    #[allow(dead_code)]
     fn synchronize(&mut self) {
         self.advance();
 
@@ -174,7 +179,7 @@ impl Parser {
         if self.check(&token_type) {
             Ok(self.advance())
         } else {
-            Err(Error::ParseError {
+            Err(Error::Parse {
                 msg: message.to_owned(),
                 line: self.peek().get_line(),
             })

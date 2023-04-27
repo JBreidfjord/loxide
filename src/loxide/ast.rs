@@ -1,3 +1,5 @@
+use std::fmt;
+
 use super::token::Token;
 
 pub enum Expr {
@@ -9,17 +11,32 @@ pub enum Expr {
     Grouping {
         expr: Box<Expr>,
     },
-    Literal {
-        value: Token,
-    },
+    Literal(Literal),
     Unary {
         operator: Token,
         right: Box<Expr>,
     },
 }
 
-pub trait Visitor {
-    type ExprReturn;
+#[derive(Debug)]
+pub enum Literal {
+    Nil,
+    Number(f64),
+    Bool(bool),
+    String(String),
+}
 
-    fn visit_expr(&self, expr: &Expr) -> Self::ExprReturn;
+pub trait Visitor<R> {
+    fn visit_expr(&self, expr: &Expr) -> R;
+}
+
+impl fmt::Display for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Literal::Nil => write!(f, "nil"),
+            Literal::Bool(v) => write!(f, "{}", v),
+            Literal::Number(v) => write!(f, "{}", v),
+            Literal::String(v) => write!(f, "{}", v),
+        }
+    }
 }

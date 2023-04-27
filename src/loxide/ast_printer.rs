@@ -1,20 +1,16 @@
-use super::{
-    ast::{Expr, Visitor},
-    token_type::TokenType,
-};
+use super::ast::{Expr, Literal, Visitor};
 
 pub struct AstPrinter;
 
 impl AstPrinter {
-    pub fn visit_expr(&self, expr: &Expr) -> String {
-        Visitor::visit_expr(self, expr)
+    #[allow(dead_code)]
+    pub fn print(&self, expr: &Expr) -> String {
+        self.visit_expr(expr)
     }
 }
 
-impl Visitor for AstPrinter {
-    type ExprReturn = String;
-
-    fn visit_expr(&self, expr: &Expr) -> Self::ExprReturn {
+impl Visitor<String> for AstPrinter {
+    fn visit_expr(&self, expr: &Expr) -> String {
         match expr {
             Expr::Binary {
                 left,
@@ -27,13 +23,11 @@ impl Visitor for AstPrinter {
                 self.visit_expr(right),
             ),
             Expr::Grouping { expr } => format!("(group {})", self.visit_expr(expr)),
-            Expr::Literal { value } => match value.get_token_type() {
-                TokenType::Nil => String::from("nil"),
-                TokenType::True => String::from("true"),
-                TokenType::False => String::from("false"),
-                TokenType::Number(v) => v.to_string(),
-                TokenType::String(v) => v,
-                _ => panic!("Invalid token type"),
+            Expr::Literal(literal) => match literal {
+                Literal::Nil => String::from("nil"),
+                Literal::Bool(v) => v.to_string(),
+                Literal::Number(v) => v.to_string(),
+                Literal::String(v) => v.to_owned(),
             },
             Expr::Unary { operator, right } => {
                 format!("({} {})", operator.get_lexeme(), self.visit_expr(right))
