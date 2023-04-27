@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use super::{
-    ast::{Expr, Literal},
+    ast::{Expr, Literal, Stmt},
     token::Token,
     token_type::TokenType,
 };
@@ -9,7 +9,7 @@ use super::{
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("[line {line}] {msg}")]
-    Parse { msg: String, line: usize },
+    Syntax { msg: String, line: usize },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -24,8 +24,42 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> Result<Expr, Vec<Error>> {
-        self.expression().map_err(|e| vec![e])
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, Vec<Error>> {
+        let mut statements = Vec::new();
+        let mut errors = Vec::new();
+
+        while !self.is_at_end() {
+            match self.statement() {
+                Ok(stmt) => statements.push(stmt),
+                Err(err) => errors.push(err),
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(statements)
+        } else {
+            Err(errors)
+        }
+    }
+
+    fn statement(&mut self) -> Result<Stmt> {
+        if self.match_token(&[TokenType::Print]) {
+            self.print_statement()
+        } else {
+            self.expression_statement()
+        }
+    }
+
+    fn print_statement(&mut self) -> Result<Stmt> {
+        let expr = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
+        Ok(Stmt::Print(expr))
+    }
+
+    fn expression_statement(&mut self) -> Result<Stmt> {
+        let expr = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
+        Ok(Stmt::Expression(expr))
     }
 
     fn expression(&mut self) -> Result<Expr> {
@@ -129,7 +163,7 @@ impl Parser {
                 Ok(Expr::Grouping(Box::new(expr)))
             }
 
-            _ => Err(Error::Parse {
+            _ => Err(Error::Syntax {
                 msg: "Expect expression.".to_owned(),
                 line: previous.get_line(),
             }),
@@ -165,7 +199,7 @@ impl Parser {
     fn match_token(&mut self, token_types: &[TokenType]) -> bool {
         for token_type in token_types {
             if self.check(token_type) {
-                self.advance();
+                self.advance(); // Consume the token
                 return true;
             }
         }
@@ -177,7 +211,7 @@ impl Parser {
         if self.check(&token_type) {
             Ok(self.advance())
         } else {
-            Err(Error::Parse {
+            Err(Error::Syntax {
                 msg: message.to_owned(),
                 line: self.peek().get_line(),
             })

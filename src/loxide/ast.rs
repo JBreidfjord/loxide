@@ -16,6 +16,11 @@ pub enum Expr {
     },
 }
 
+pub enum Stmt {
+    Expression(Expr),
+    Print(Expr),
+}
+
 #[derive(Debug)]
 pub enum Literal {
     Nil,
