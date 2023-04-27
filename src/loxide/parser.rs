@@ -29,7 +29,7 @@ impl Parser {
         let mut errors = Vec::new();
 
         while !self.is_at_end() {
-            match self.statement() {
+            match self.declaration() {
                 Ok(stmt) => statements.push(stmt),
                 Err(err) => errors.push(err),
             }
@@ -40,6 +40,36 @@ impl Parser {
         } else {
             Err(errors)
         }
+    }
+
+    fn declaration(&mut self) -> Result<Stmt> {
+        let result = if self.match_token(&[TokenType::Var]) {
+            self.var_declaration()
+        } else {
+            self.statement()
+        };
+
+        // Synchronize on error
+        if result.is_err() {
+            self.synchronize();
+        }
+        result
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt> {
+        let name = self.consume_identifier("Expect variable name.")?;
+
+        let initializer = if self.match_token(&[TokenType::Equal]) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+
+        self.consume(
+            TokenType::Semicolon,
+            "Expect ';' after variable declaration.",
+        )?;
+        Ok(Stmt::Var { name, initializer })
     }
 
     fn statement(&mut self) -> Result<Stmt> {
@@ -154,8 +184,10 @@ impl Parser {
             TokenType::False => Ok(Expr::Literal(Literal::Bool(false))),
             TokenType::True => Ok(Expr::Literal(Literal::Bool(true))),
             TokenType::Nil => Ok(Expr::Literal(Literal::Nil)),
-            TokenType::Number(v) => Ok(Expr::Literal(Literal::Number(v))),
-            TokenType::String(v) => Ok(Expr::Literal(Literal::String(v))),
+            TokenType::Number(n) => Ok(Expr::Literal(Literal::Number(n))),
+            TokenType::String(s) => Ok(Expr::Literal(Literal::String(s))),
+
+            TokenType::Identifier(_) => Ok(Expr::Variable(previous)),
 
             TokenType::LeftParen => {
                 let expr = self.expression()?;
@@ -170,7 +202,6 @@ impl Parser {
         }
     }
 
-    #[allow(dead_code)]
     fn synchronize(&mut self) {
         self.advance();
 
@@ -180,16 +211,18 @@ impl Parser {
                 return;
             }
 
-            match self.peek().get_token_type() {
+            if matches!(
+                self.peek().get_token_type(),
                 TokenType::Class
-                | TokenType::Fn
-                | TokenType::Var
-                | TokenType::For
-                | TokenType::If
-                | TokenType::While
-                | TokenType::Print
-                | TokenType::Return => return,
-                _ => {}
+                    | TokenType::Fn
+                    | TokenType::Var
+                    | TokenType::For
+                    | TokenType::If
+                    | TokenType::While
+                    | TokenType::Print
+                    | TokenType::Return
+            ) {
+                return;
             }
 
             self.advance();
@@ -215,6 +248,20 @@ impl Parser {
                 msg: message.to_owned(),
                 line: self.peek().get_line(),
             })
+        }
+    }
+
+    fn consume_identifier(&mut self, message: &str) -> Result<Token> {
+        let error = Error::Syntax {
+            msg: message.to_owned(),
+            line: self.peek().get_line(),
+        };
+        if self.is_at_end() {
+            return Err(error);
+        }
+        match self.peek().get_token_type() {
+            TokenType::Identifier(_) => Ok(self.advance()),
+            _ => Err(error),
         }
     }
 

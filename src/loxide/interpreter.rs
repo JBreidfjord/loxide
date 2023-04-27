@@ -10,10 +10,6 @@ use super::{
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[allow(dead_code)]
-    #[error("Error converting literal {literal}.")]
-    LiteralConversion { literal: Literal },
-
     #[error(
         "Operator `{operator}` expected one of: [{}], found {} of type {}.",
         .expected.join(", "),
@@ -75,7 +71,6 @@ impl TryFrom<&Literal> for Value {
             Literal::Bool(b) => Ok(Value::Bool(*b)),
             Literal::Number(n) => Ok(Value::Number(*n)),
             Literal::String(s) => Ok(Value::String(s.to_owned())),
-            // _ => Err(Error::LiteralConversion { literal }),
         }
     }
 }
@@ -125,6 +120,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 self.visit_expr(expr)?;
             }
             Stmt::Print(expr) => println!("{}", self.visit_expr(expr)?),
+            Stmt::Var { name, initializer } => todo!(),
         }
 
         Ok(())
@@ -235,6 +231,8 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     }),
                 }
             }
+
+            Expr::Variable(_) => todo!(),
         }
     }
 }
