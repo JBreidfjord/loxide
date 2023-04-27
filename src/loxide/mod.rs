@@ -19,6 +19,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
 }
 
+type Result<T = (), E = Error> = std::result::Result<T, E>;
+
 pub struct Loxide;
 
 impl Loxide {
@@ -26,7 +28,7 @@ impl Loxide {
         Self
     }
 
-    fn run(&self, source: Vec<u8>) -> Result<(), Error> {
+    fn run(&self, source: Vec<u8>) -> Result {
         let mut scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens().map_err(Error::Scanner)?;
 
@@ -38,12 +40,12 @@ impl Loxide {
         Ok(())
     }
 
-    pub fn run_file(&self, path: &str) -> Result<(), Error> {
+    pub fn run_file(&self, path: &str) -> Result {
         let source = std::fs::read(path)?;
         self.run(source)
     }
 
-    pub fn run_repl(&mut self) -> Result<(), Error> {
+    pub fn run_repl(&mut self) -> Result {
         // Create a reader to read input from stdin
         let stdin = std::io::stdin();
 

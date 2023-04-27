@@ -18,6 +18,8 @@ pub enum Error {
     NumberParse(#[from] std::num::ParseFloatError),
 }
 
+type Result<T, E = Error> = std::result::Result<T, E>;
+
 pub struct Scanner {
     source: Vec<u8>,
     start: usize,
@@ -66,7 +68,7 @@ impl Scanner {
         self.current >= self.source.len()
     }
 
-    fn scan_token(&mut self) -> Result<Option<TokenType>, Error> {
+    fn scan_token(&mut self) -> Result<Option<TokenType>> {
         match self.advance() {
             // Single character tokens
             b'(' => Ok(Some(TokenType::LeftParen)),
@@ -146,7 +148,7 @@ impl Scanner {
         self.source[self.current - 1]
     }
 
-    fn make_token(&mut self, token_type: TokenType) -> Result<Token, Error> {
+    fn make_token(&mut self, token_type: TokenType) -> Result<Token> {
         let text = self.substring(self.start, self.current)?;
         Ok(Token::new(token_type, text, self.line))
     }
@@ -173,12 +175,12 @@ impl Scanner {
         self.source[self.current + 1]
     }
 
-    fn substring(&self, start: usize, end: usize) -> Result<String, Error> {
+    fn substring(&self, start: usize, end: usize) -> Result<String> {
         String::from_utf8(self.source[start..end].to_vec())
             .map_err(|_| Error::InvalidUtf8Char { line: self.line })
     }
 
-    fn string(&mut self) -> Result<TokenType, Error> {
+    fn string(&mut self) -> Result<TokenType> {
         // Seek to the end of the string
         while self.peek() != b'"' && !self.is_at_end() {
             if self.peek() == b'\n' {
@@ -199,7 +201,7 @@ impl Scanner {
         Ok(TokenType::String(value))
     }
 
-    fn number(&mut self) -> Result<TokenType, Error> {
+    fn number(&mut self) -> Result<TokenType> {
         // Seek to the end of the number
         while self.peek().is_ascii_digit() {
             self.advance();
@@ -220,7 +222,7 @@ impl Scanner {
         Ok(TokenType::Number(value))
     }
 
-    fn identifier(&mut self) -> Result<TokenType, Error> {
+    fn identifier(&mut self) -> Result<TokenType> {
         // Seek to the end of the identifier
         while self.peek().is_ascii_alphanumeric() || self.peek() == b'_' {
             self.advance();
