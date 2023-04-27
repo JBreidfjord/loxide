@@ -30,24 +30,92 @@ impl Parser {
         expr
     }
 
-    fn comparison(&self) -> Expr {
-        todo!()
+    fn comparison(&mut self) -> Expr {
+        let mut expr = self.term();
+
+        while self.match_token(&[
+            TokenType::Greater,
+            TokenType::GreaterEqual,
+            TokenType::Less,
+            TokenType::LessEqual,
+        ]) {
+            let operator = self.previous();
+            let right = self.term();
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            }
+        }
+
+        expr
     }
 
-    fn term(&self) -> Expr {
-        todo!()
+    fn term(&mut self) -> Expr {
+        let mut expr = self.factor();
+
+        while self.match_token(&[TokenType::Minus, TokenType::Plus]) {
+            let operator = self.previous();
+            let right = self.factor();
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            }
+        }
+
+        expr
     }
 
-    fn factor(&self) -> Expr {
-        todo!()
+    fn factor(&mut self) -> Expr {
+        let mut expr = self.unary();
+
+        while self.match_token(&[TokenType::Slash, TokenType::Star]) {
+            let operator = self.previous();
+            let right = self.unary();
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            }
+        }
+
+        expr
     }
 
-    fn unary(&self) -> Expr {
-        todo!()
+    fn unary(&mut self) -> Expr {
+        if self.match_token(&[TokenType::Bang, TokenType::Minus]) {
+            let operator = self.previous();
+            let right = self.unary();
+            Expr::Unary {
+                operator,
+                right: Box::new(right),
+            }
+        } else {
+            self.primary()
+        }
     }
 
-    fn primary(&self) -> Expr {
-        todo!()
+    fn primary(&mut self) -> Expr {
+        self.advance();
+        let previous = self.previous();
+        match previous.get_token_type() {
+            TokenType::False
+            | TokenType::True
+            | TokenType::Nil
+            | TokenType::Number(_)
+            | TokenType::String(_) => Expr::Literal { value: previous },
+
+            TokenType::LeftParen => {
+                let expr = self.expression();
+                self.consume(TokenType::RightParen, "Expect ')' after expression.");
+                Expr::Grouping {
+                    expr: Box::new(expr),
+                }
+            }
+
+            _ => todo!(),
+        }
     }
 
     fn match_token(&mut self, token_types: &[TokenType]) -> bool {
@@ -59,6 +127,10 @@ impl Parser {
         }
 
         false
+    }
+
+    fn consume(&mut self, token_type: TokenType, message: &str) -> Token {
+        todo!()
     }
 
     fn check(&self, token_type: &TokenType) -> bool {
