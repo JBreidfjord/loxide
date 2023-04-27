@@ -12,7 +12,7 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-struct Parser {
+pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
 }

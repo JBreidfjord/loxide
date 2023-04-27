@@ -2,7 +2,7 @@ use std::io::Write;
 
 use thiserror::Error;
 
-use self::scanner::Scanner;
+use self::{parser::Parser, scanner::Scanner};
 
 pub mod ast;
 pub mod ast_printer;
@@ -32,10 +32,10 @@ impl Loxide {
         let mut scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens().map_err(Error::Scanner)?;
 
-        // For now, just print the tokens
-        for token in tokens {
-            println!("{}", token);
-        }
+        let mut parser = Parser::new(tokens);
+        let expr = parser.parse().unwrap();
+
+        println!("{}", ast_printer::AstPrinter.visit_expr(&expr));
 
         Ok(())
     }
