@@ -45,13 +45,11 @@ impl Loxide {
         let tokens = scanner.scan_tokens().map_err(Error::Scanner)?;
 
         let mut parser = Parser::new(tokens);
-        let expr = parser.parse().map_err(Error::Parser)?;
+        let statements = parser.parse().map_err(Error::Parser)?;
 
-        let value = self.interpreter.interpret(&expr).map_err(Error::Runtime)?;
-
-        println!("{}", value);
-
-        Ok(())
+        self.interpreter
+            .interpret(&statements)
+            .map_err(Error::Runtime)
     }
 
     pub fn run_file(&self, path: &str) -> Result {

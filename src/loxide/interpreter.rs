@@ -43,8 +43,6 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub struct Interpreter;
-
 #[derive(Debug)]
 pub enum Value {
     Nil,
@@ -105,20 +103,27 @@ impl fmt::Display for Value {
     }
 }
 
+pub struct Interpreter;
+
 impl Interpreter {
     pub fn new() -> Self {
         Self
     }
 
-    pub fn interpret(&self, expr: &Expr) -> Result<Value> {
-        self.visit_expr(expr)
+    pub fn interpret(&self, statements: &[Stmt]) -> Result<()> {
+        for stmt in statements {
+            self.visit_stmt(stmt)?;
+        }
+        Ok(())
     }
 }
 
 impl Visitor<Result<Value>, Result<()>> for Interpreter {
     fn visit_stmt(&self, stmt: &Stmt) -> Result<()> {
         match stmt {
-            Stmt::Expression(expr) => self.visit_expr(expr)?,
+            Stmt::Expression(expr) => {
+                self.visit_expr(expr)?;
+            }
             Stmt::Print(expr) => println!("{}", self.visit_expr(expr)?),
         }
 
