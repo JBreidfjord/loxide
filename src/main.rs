@@ -1,4 +1,4 @@
-use loxide::ast::Expr;
+use loxide::ast::{Expr, Literal};
 use loxide::ast_printer::AstPrinter;
 use loxide::token::Token;
 use loxide::token_type::TokenType;
@@ -11,15 +11,11 @@ fn main() {
     let expression = Expr::Binary {
         left: Box::new(Expr::Unary {
             operator: Token::new(TokenType::Minus, String::from("-"), 1),
-            right: Box::new(Expr::Literal {
-                value: Token::new(TokenType::Number(123.0), String::from("123"), 1),
-            }),
+            right: Box::new(Expr::Literal(Literal::Number(123.0))),
         }),
         operator: Token::new(TokenType::Star, String::from("*"), 1),
         right: Box::new(Expr::Grouping {
-            expr: Box::new(Expr::Literal {
-                value: Token::new(TokenType::Number(45.67), String::from("45.67"), 1),
-            }),
+            expr: Box::new(Expr::Literal(Literal::Number(45.67))),
         }),
     };
     println!("{}", AstPrinter.visit_expr(&expression));

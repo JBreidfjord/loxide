@@ -1,6 +1,10 @@
 use thiserror::Error;
 
-use super::{ast::Expr, token::Token, token_type::TokenType};
+use super::{
+    ast::{Expr, Literal},
+    token::Token,
+    token_type::TokenType,
+};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -113,11 +117,11 @@ impl Parser {
     fn primary(&mut self) -> Result<Expr> {
         let previous = self.advance();
         match previous.get_token_type() {
-            TokenType::False
-            | TokenType::True
-            | TokenType::Nil
-            | TokenType::Number(_)
-            | TokenType::String(_) => Ok(Expr::Literal { value: previous }),
+            TokenType::False => Ok(Expr::Literal(Literal::Bool(false))),
+            TokenType::True => Ok(Expr::Literal(Literal::Bool(true))),
+            TokenType::Nil => Ok(Expr::Literal(Literal::Nil)),
+            TokenType::Number(v) => Ok(Expr::Literal(Literal::Number(v))),
+            TokenType::String(v) => Ok(Expr::Literal(Literal::String(v))),
 
             TokenType::LeftParen => {
                 let expr = self.expression()?;
