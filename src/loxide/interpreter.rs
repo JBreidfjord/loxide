@@ -1,7 +1,10 @@
+use std::fmt;
+
 use thiserror::Error;
 
 use super::{
     ast::{Expr, Literal, Visitor},
+    token::Token,
     token_type::TokenType,
 };
 
@@ -9,6 +12,18 @@ use super::{
 pub enum Error {
     #[error("Error converting literal {literal}.")]
     LiteralConversion { literal: Literal },
+
+    #[error(
+        "`{operator}` expected one of: [{}], found {} of type {}.",
+        .expected.join(", "),
+        .found,
+        .found.type_of()
+    )]
+    InvalidOperand {
+        operator: TokenType,
+        expected: Vec<String>,
+        found: ExprReturn,
+    },
 
     #[error("Unsupported unary operator `{operator}` on type {}.", .value.type_of())]
     UnsupportedUnary {
@@ -61,10 +76,10 @@ impl TryFrom<&Literal> for ExprReturn {
     fn try_from(literal: &Literal) -> Result<Self, Self::Error> {
         match literal {
             Literal::Nil => Ok(ExprReturn::Nil),
-            Literal::Bool(v) => Ok(ExprReturn::Bool(*v)),
-            Literal::Number(v) => Ok(ExprReturn::Number(*v)),
-            Literal::String(v) => Ok(ExprReturn::String(v.to_owned())),
-            // _ => Err(Error::LiteralError { literal }),
+            Literal::Bool(b) => Ok(ExprReturn::Bool(*b)),
+            Literal::Number(n) => Ok(ExprReturn::Number(*n)),
+            Literal::String(s) => Ok(ExprReturn::String(s.to_owned())),
+            // _ => Err(Error::LiteralConversion { literal }),
         }
     }
 }
@@ -81,6 +96,17 @@ impl PartialEq for ExprReturn {
     }
 }
 
+impl fmt::Display for ExprReturn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Nil => write!(f, "nil"),
+            Self::Bool(b) => b.fmt(f),
+            Self::Number(n) => n.fmt(f),
+            Self::String(s) => write!(f, "{:?}", s),
+        }
+    }
+}
+
 impl Visitor<Result<ExprReturn>> for Interpreter {
     fn visit_expr(&self, expr: &Expr) -> Result<ExprReturn> {
         match expr {
@@ -88,19 +114,25 @@ impl Visitor<Result<ExprReturn>> for Interpreter {
                 let expr_return = ExprReturn::try_from(literal)?;
                 Ok(expr_return)
             }
+
             Expr::Grouping { expr } => self.visit_expr(expr),
+
             Expr::Unary { operator, right } => {
                 let right = self.visit_expr(right)?;
 
-                match (operator.get_token_type(), right) {
-                    (TokenType::Minus, ExprReturn::Number(v)) => Ok(ExprReturn::Number(-v)),
-                    (TokenType::Bang, right) => Ok(ExprReturn::Bool(!right.is_truthy())),
-                    (token_type, right) => Err(Error::UnsupportedUnary {
-                        operator: token_type,
+                match operator.get_token_type() {
+                    TokenType::Minus => match right {
+                        ExprReturn::Number(n) => Ok(ExprReturn::Number(-n)),
+                        _ => invalid_operand_error(operator, &["Number"], right),
+                    },
+                    TokenType::Bang => Ok(ExprReturn::Bool(!right.is_truthy())),
+                    op => Err(Error::UnsupportedUnary {
+                        operator: op,
                         value: right,
                     }),
                 }
             }
+
             Expr::Binary {
                 left,
                 operator,
@@ -109,40 +141,89 @@ impl Visitor<Result<ExprReturn>> for Interpreter {
                 let left = self.visit_expr(left)?;
                 let right = self.visit_expr(right)?;
 
-                match (left, operator.get_token_type(), right) {
-                    (ExprReturn::Number(left), TokenType::Minus, ExprReturn::Number(right)) => {
-                        Ok(ExprReturn::Number(left - right))
-                    }
-                    (ExprReturn::Number(left), TokenType::Slash, ExprReturn::Number(right)) => {
-                        Ok(ExprReturn::Number(left / right))
-                    }
-                    (ExprReturn::Number(left), TokenType::Star, ExprReturn::Number(right)) => {
-                        Ok(ExprReturn::Number(left * right))
-                    }
-                    (ExprReturn::Number(left), TokenType::Plus, ExprReturn::Number(right)) => {
-                        Ok(ExprReturn::Number(left + right))
-                    }
-                    (ExprReturn::String(left), TokenType::Plus, ExprReturn::String(right)) => {
-                        Ok(ExprReturn::String(format!("{}{}", left, right)))
-                    }
-                    (ExprReturn::Number(left), TokenType::Greater, ExprReturn::Number(right)) => {
-                        Ok(ExprReturn::Bool(left > right))
-                    }
-                    (
-                        ExprReturn::Number(left),
-                        TokenType::GreaterEqual,
-                        ExprReturn::Number(right),
-                    ) => Ok(ExprReturn::Bool(left >= right)),
-                    (ExprReturn::Number(left), TokenType::Less, ExprReturn::Number(right)) => {
-                        Ok(ExprReturn::Bool(left < right))
-                    }
-                    (ExprReturn::Number(left), TokenType::LessEqual, ExprReturn::Number(right)) => {
-                        Ok(ExprReturn::Bool(left <= right))
-                    }
-                    (left, TokenType::BangEqual, right) => Ok(ExprReturn::Bool(left != right)),
-                    (left, TokenType::EqualEqual, right) => Ok(ExprReturn::Bool(left == right)),
-                    (left, token_type, right) => Err(Error::UnsupportedBinary {
-                        operator: token_type,
+                match operator.get_token_type() {
+                    TokenType::Minus => match (left, right) {
+                        (ExprReturn::Number(l), ExprReturn::Number(r)) => {
+                            Ok(ExprReturn::Number(l - r))
+                        }
+                        (ExprReturn::Number(_), right) => {
+                            invalid_operand_error(operator, &["Number"], right)
+                        }
+                        (left, _) => invalid_operand_error(operator, &["Number"], left),
+                    },
+                    TokenType::Slash => match (left, right) {
+                        (ExprReturn::Number(l), ExprReturn::Number(r)) => {
+                            Ok(ExprReturn::Number(l / r))
+                        }
+                        (ExprReturn::Number(_), right) => {
+                            invalid_operand_error(operator, &["Number"], right)
+                        }
+                        (left, _) => invalid_operand_error(operator, &["Number"], left),
+                    },
+                    TokenType::Star => match (left, right) {
+                        (ExprReturn::Number(l), ExprReturn::Number(r)) => {
+                            Ok(ExprReturn::Number(l * r))
+                        }
+                        (ExprReturn::Number(_), right) => {
+                            invalid_operand_error(operator, &["Number"], right)
+                        }
+                        (left, _) => invalid_operand_error(operator, &["Number"], left),
+                    },
+                    TokenType::Plus => match (left, right) {
+                        (ExprReturn::Number(l), ExprReturn::Number(r)) => {
+                            Ok(ExprReturn::Number(l + r))
+                        }
+                        (ExprReturn::String(l), ExprReturn::String(r)) => {
+                            Ok(ExprReturn::String(format!("{}{}", l, r)))
+                        }
+                        (ExprReturn::Number(_), right) => {
+                            invalid_operand_error(operator, &["Number"], right)
+                        }
+                        (ExprReturn::String(_), right) => {
+                            invalid_operand_error(operator, &["String"], right)
+                        }
+                        (left, _) => invalid_operand_error(operator, &["Number", "String"], left),
+                    },
+                    TokenType::Greater => match (left, right) {
+                        (ExprReturn::Number(l), ExprReturn::Number(r)) => {
+                            Ok(ExprReturn::Bool(l > r))
+                        }
+                        (ExprReturn::Number(_), right) => {
+                            invalid_operand_error(operator, &["Number"], right)
+                        }
+                        (left, _) => invalid_operand_error(operator, &["Number"], left),
+                    },
+                    TokenType::GreaterEqual => match (left, right) {
+                        (ExprReturn::Number(l), ExprReturn::Number(r)) => {
+                            Ok(ExprReturn::Bool(l >= r))
+                        }
+                        (ExprReturn::Number(_), right) => {
+                            invalid_operand_error(operator, &["Number"], right)
+                        }
+                        (left, _) => invalid_operand_error(operator, &["Number"], left),
+                    },
+                    TokenType::Less => match (left, right) {
+                        (ExprReturn::Number(l), ExprReturn::Number(r)) => {
+                            Ok(ExprReturn::Bool(l < r))
+                        }
+                        (ExprReturn::Number(_), right) => {
+                            invalid_operand_error(operator, &["Number"], right)
+                        }
+                        (left, _) => invalid_operand_error(operator, &["Number"], left),
+                    },
+                    TokenType::LessEqual => match (left, right) {
+                        (ExprReturn::Number(l), ExprReturn::Number(r)) => {
+                            Ok(ExprReturn::Bool(l <= r))
+                        }
+                        (ExprReturn::Number(_), right) => {
+                            invalid_operand_error(operator, &["Number"], right)
+                        }
+                        (left, _) => invalid_operand_error(operator, &["Number"], left),
+                    },
+                    TokenType::BangEqual => Ok(ExprReturn::Bool(left != right)),
+                    TokenType::EqualEqual => Ok(ExprReturn::Bool(left == right)),
+                    _ => Err(Error::UnsupportedBinary {
+                        operator: operator.get_token_type(),
                         left,
                         right,
                     }),
@@ -150,4 +231,16 @@ impl Visitor<Result<ExprReturn>> for Interpreter {
             }
         }
     }
+}
+
+fn invalid_operand_error<V, S: ToString>(
+    operator: &Token,
+    expected: &[S],
+    found: ExprReturn,
+) -> Result<V> {
+    Err(Error::InvalidOperand {
+        operator: operator.get_token_type(),
+        expected: expected.iter().map(ToString::to_string).collect(),
+        found,
+    })
 }
