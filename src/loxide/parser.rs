@@ -22,6 +22,10 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
+    pub fn parse(&mut self) -> Option<Expr> {
+        self.expression().map_err(|e| eprintln!("{}", e)).ok()
+    }
+
     fn expression(&mut self) -> Result<Expr> {
         self.equality()
     }
@@ -125,7 +129,35 @@ impl Parser {
                 })
             }
 
-            _ => todo!(),
+            _ => Err(Error::ParseError {
+                msg: "Expect expression.".to_owned(),
+                line: previous.get_line(),
+            }),
+        }
+    }
+
+    fn synchronize(&mut self) {
+        self.advance();
+
+        // Discard tokens until we reach a statement boundary
+        while !self.is_at_end() {
+            if self.previous().get_token_type() == TokenType::Semicolon {
+                return;
+            }
+
+            match self.peek().get_token_type() {
+                TokenType::Class
+                | TokenType::Fn
+                | TokenType::Var
+                | TokenType::For
+                | TokenType::If
+                | TokenType::While
+                | TokenType::Print
+                | TokenType::Return => return,
+                _ => {}
+            }
+
+            self.advance();
         }
     }
 
