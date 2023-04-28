@@ -93,7 +93,29 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expr> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> Result<Expr> {
+        let expr = self.equality()?;
+
+        if self.match_token(&[TokenType::Equal]) {
+            let equals = self.previous();
+            let value = self.assignment()?;
+
+            match expr {
+                Expr::Variable(name) => Ok(Expr::Assign {
+                    name,
+                    value: Box::new(value),
+                }),
+                _ => Err(Error::Syntax {
+                    msg: "Invalid assignment target.".to_string(),
+                    line: equals.get_line(),
+                }),
+            }
+        } else {
+            Ok(expr)
+        }
     }
 
     fn equality(&mut self) -> Result<Expr> {
@@ -240,20 +262,20 @@ impl Parser {
         false
     }
 
-    fn consume(&mut self, token_type: TokenType, message: &str) -> Result<Token> {
+    fn consume<S: ToString>(&mut self, token_type: TokenType, message: S) -> Result<Token> {
         if self.check(&token_type) {
             Ok(self.advance())
         } else {
             Err(Error::Syntax {
-                msg: message.to_owned(),
+                msg: message.to_string(),
                 line: self.peek().get_line(),
             })
         }
     }
 
-    fn consume_identifier(&mut self, message: &str) -> Result<Token> {
+    fn consume_identifier<S: ToString>(&mut self, message: S) -> Result<Token> {
         let error = Error::Syntax {
-            msg: message.to_owned(),
+            msg: message.to_string(),
             line: self.peek().get_line(),
         };
         if self.is_at_end() {

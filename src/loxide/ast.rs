@@ -15,6 +15,10 @@ pub enum Expr {
         right: Box<Expr>,
     },
     Variable(Token),
+    Assign {
+        name: Token,
+        value: Box<Expr>,
+    },
 }
 
 pub enum Stmt {
@@ -35,7 +39,7 @@ pub enum Literal {
 }
 
 pub trait Visitor<E, S> {
-    fn visit_expr(&self, expr: &Expr) -> E;
+    fn visit_expr(&mut self, expr: &Expr) -> E;
     fn visit_stmt(&mut self, stmt: &Stmt) -> S;
 }
 

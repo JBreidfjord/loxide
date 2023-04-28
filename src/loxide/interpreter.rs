@@ -142,7 +142,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
         Ok(())
     }
 
-    fn visit_expr(&self, expr: &Expr) -> Result<Value> {
+    fn visit_expr(&mut self, expr: &Expr) -> Result<Value> {
         match expr {
             Expr::Literal(literal) => {
                 let value = Value::try_from(literal)?;
@@ -254,6 +254,17 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     .ok_or(Error::UndefinedVariable {
                         name: name.get_lexeme(),
                     })
+            }
+
+            Expr::Assign { name, value } => {
+                let value = self.visit_expr(value)?;
+                if self.environment.assign(name.get_lexeme(), value.clone()) {
+                    Ok(value)
+                } else {
+                    Err(Error::UndefinedVariable {
+                        name: name.get_lexeme(),
+                    })
+                }
             }
         }
     }

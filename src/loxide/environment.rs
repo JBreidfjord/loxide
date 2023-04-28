@@ -20,4 +20,13 @@ impl Environment {
     pub fn get(&self, name: String) -> Option<Value> {
         self.variables.get(&name).cloned()
     }
+
+    pub fn assign(&mut self, name: String, value: Value) -> bool {
+        if !self.variables.contains_key(&name) {
+            return false;
+        }
+
+        self.variables.insert(name, value);
+        true
+    }
 }
