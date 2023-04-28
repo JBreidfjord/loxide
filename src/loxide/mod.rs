@@ -4,13 +4,13 @@ use thiserror::Error;
 
 use self::{interpreter::Interpreter, parser::Parser, scanner::Scanner};
 
-pub mod ast;
-pub mod ast_printer;
+mod ast;
+mod environment;
 mod interpreter;
 mod parser;
 mod scanner;
-pub mod token;
-pub mod token_type;
+mod token;
+mod token_type;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -40,21 +40,19 @@ impl Loxide {
         }
     }
 
-    fn run(&self, source: Vec<u8>) -> Result {
+    fn run(&mut self, source: Vec<u8>) -> Result {
         let mut scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens().map_err(Error::Scanner)?;
 
         let mut parser = Parser::new(tokens);
-        let expr = parser.parse().map_err(Error::Parser)?;
+        let statements = parser.parse().map_err(Error::Parser)?;
 
-        let expr_return = self.interpreter.interpret(&expr).map_err(Error::Runtime)?;
-
-        println!("{}", expr_return);
-
-        Ok(())
+        self.interpreter
+            .interpret(&statements)
+            .map_err(Error::Runtime)
     }
 
-    pub fn run_file(&self, path: &str) -> Result {
+    pub fn run_file(&mut self, path: &str) -> Result {
         let source = std::fs::read(path)?;
         self.run(source)
     }

@@ -8,14 +8,27 @@ pub enum Expr {
         operator: Token,
         right: Box<Expr>,
     },
-    Grouping {
-        expr: Box<Expr>,
-    },
+    Grouping(Box<Expr>),
     Literal(Literal),
     Unary {
         operator: Token,
         right: Box<Expr>,
     },
+    Variable(Token),
+    Assign {
+        name: Token,
+        value: Box<Expr>,
+    },
+}
+
+pub enum Stmt {
+    Expression(Expr),
+    Print(Expr),
+    Var {
+        name: Token,
+        initializer: Option<Expr>,
+    },
+    Block(Vec<Stmt>),
 }
 
 #[derive(Debug)]
@@ -26,8 +39,9 @@ pub enum Literal {
     String(String),
 }
 
-pub trait Visitor<R> {
-    fn visit_expr(&self, expr: &Expr) -> R;
+pub trait Visitor<E, S> {
+    fn visit_expr(&mut self, expr: &Expr) -> E;
+    fn visit_stmt(&mut self, stmt: &Stmt) -> S;
 }
 
 impl fmt::Display for Literal {
