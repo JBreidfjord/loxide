@@ -109,7 +109,7 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         Self {
-            environment: Environment::new(),
+            environment: Environment::global(),
         }
     }
 
@@ -250,7 +250,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
             Expr::Variable(name) => {
                 self.environment
-                    .get(name.get_lexeme())
+                    .lookup(name.get_lexeme())
                     .ok_or(Error::UndefinedVariable {
                         name: name.get_lexeme(),
                     })
