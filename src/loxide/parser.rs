@@ -79,11 +79,69 @@ impl Parser {
             TokenType::LeftBrace => Ok(Stmt::Block(self.block()?)),
             TokenType::If => self.if_statement(),
             TokenType::While => self.while_statement(),
+            TokenType::For => self.for_statement(),
             _ => {
                 self.restore(); // restore the previous token so we can parse it as an expression
                 self.expression_statement()
             }
         }
+    }
+
+    fn for_statement(&mut self) -> Result<Stmt> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'for'.")?;
+
+        // Parse initializer
+        let initializer = if self.match_token(&[TokenType::Semicolon]) {
+            // If the token is a semicolon, the initializer has been omitted
+            None
+        } else if self.match_token(&[TokenType::Var]) {
+            // Otherwise, if the token is a var, parse a variable declaration
+            Some(self.var_declaration()?)
+        } else {
+            // Otherwise, it's an expression statement
+            Some(self.expression_statement()?)
+        };
+
+        // Parse condition, defaulting to true if omitted
+        let condition = if !self.check(&TokenType::Semicolon) {
+            self.expression()?
+        } else {
+            Expr::Literal(Literal::Bool(true))
+        };
+        self.consume(TokenType::Semicolon, "Expect ';' after loop condition.")?;
+
+        // Parse increment
+        let increment = if !self.check(&TokenType::RightParen) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(TokenType::RightParen, "Expect ')' after 'for' clauses.")?;
+
+        // Parse loop body
+        let mut body = self.statement()?;
+
+        // Desugar for loop into while loop
+        // for (initializer; condition; increment) body;
+        // initializer; while (condition) { body; increment; }
+
+        // If there is an increment, add it to a block after the body
+        if let Some(increment) = increment {
+            body = Stmt::Block(vec![body, Stmt::Expression(increment)]);
+        }
+
+        // Wrap the body in a while loop with the condition
+        body = Stmt::While {
+            condition,
+            body: Box::new(body),
+        };
+
+        // If there is an initializer, add it before the while loop
+        if let Some(initializer) = initializer {
+            body = Stmt::Block(vec![initializer, body])
+        }
+
+        Ok(body)
     }
 
     fn while_statement(&mut self) -> Result<Stmt> {
