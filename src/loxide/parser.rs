@@ -73,11 +73,25 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Stmt> {
+        // match_token is used so we can consume the token if it matches
         if self.match_token(&[TokenType::Print]) {
             self.print_statement()
+        } else if self.match_token(&[TokenType::LeftBrace]) {
+            Ok(Stmt::Block(self.block()?))
         } else {
             self.expression_statement()
         }
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt>> {
+        let mut statements = Vec::new();
+
+        while !self.is_at_end() && !self.check(&TokenType::RightBrace) {
+            statements.push(self.declaration()?);
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}}' after block.")?;
+        Ok(statements)
     }
 
     fn print_statement(&mut self) -> Result<Stmt> {

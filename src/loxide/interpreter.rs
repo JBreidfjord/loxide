@@ -137,6 +137,18 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 };
                 self.environment.define(name.get_lexeme(), value)
             }
+
+            Stmt::Block(statements) => {
+                let current = self.environment.clone(); // Store current environment
+
+                // Create a new environment for the block and visit each statement
+                self.environment = self.environment.nest();
+                for stmt in statements {
+                    self.visit_stmt(stmt)?;
+                }
+
+                self.environment = current; // Restore current environment
+            }
         }
 
         Ok(())

@@ -20,7 +20,7 @@ impl Clone for Environment {
 impl Environment {
     /// Create a new global environment scope.
     pub fn global() -> Self {
-        Self(None)
+        Environment(None).nest()
     }
 
     /// Create a new nested environment scope.
@@ -43,17 +43,16 @@ impl Environment {
     }
 
     pub fn lookup(&self, name: String) -> Option<Value> {
-        // If the variable is not found in the current environment,
-        // we recursively search the enclosing environment.
-        if let Some(value) = self
-            .0
-            .as_ref()
-            .and_then(|s| s.variables.borrow().get(&name).cloned())
-        {
-            Some(value)
-        } else {
-            self.enclosing().lookup(name)
+        if let Some(scope) = self.0.as_ref() {
+            if let Some(value) = scope.variables.borrow().get(&name).cloned() {
+                return Some(value);
+            }
+
+            // If the variable is not found in the current environment,
+            // we recursively search the enclosing environment.
+            return self.enclosing().lookup(name);
         }
+        None
     }
 
     pub fn assign(&mut self, name: String, value: Value) -> bool {

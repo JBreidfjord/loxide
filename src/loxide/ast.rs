@@ -28,6 +28,7 @@ pub enum Stmt {
         name: Token,
         initializer: Option<Expr>,
     },
+    Block(Vec<Stmt>),
 }
 
 #[derive(Debug)]
