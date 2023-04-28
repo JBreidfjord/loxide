@@ -73,17 +73,16 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Stmt> {
-        // match_token is used so we can consume the token if it matches
-        if self.match_token(&[TokenType::Print]) {
-            self.print_statement()
-        } else if self.match_token(&[TokenType::LeftBrace]) {
-            Ok(Stmt::Block(self.block()?))
-        } else if self.match_token(&[TokenType::If]) {
-            self.if_statement()
-        } else if self.match_token(&[TokenType::While]) {
-            self.while_statement()
-        } else {
-            self.expression_statement()
+        let previous = self.advance(); // consume and return the current token
+        match previous.get_token_type() {
+            TokenType::Print => self.print_statement(),
+            TokenType::LeftBrace => Ok(Stmt::Block(self.block()?)),
+            TokenType::If => self.if_statement(),
+            TokenType::While => self.while_statement(),
+            _ => {
+                self.restore(); // restore the previous token so we can parse it as an expression
+                self.expression_statement()
+            }
         }
     }
 
@@ -380,6 +379,12 @@ impl Parser {
             self.current += 1;
         }
         self.previous()
+    }
+
+    fn restore(&mut self) {
+        if self.current > 0 {
+            self.current -= 1;
+        }
     }
 
     fn peek(&self) -> Token {
