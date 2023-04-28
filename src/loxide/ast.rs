@@ -39,6 +39,10 @@ pub enum Stmt {
         then_branch: Box<Stmt>,
         else_branch: Option<Box<Stmt>>,
     },
+    While {
+        condition: Expr,
+        body: Box<Stmt>,
+    },
 }
 
 #[derive(Debug)]

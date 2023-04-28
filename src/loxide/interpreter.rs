@@ -163,6 +163,12 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     self.visit_stmt(else_branch)?;
                 }
             }
+
+            Stmt::While { condition, body } => {
+                while self.visit_expr(condition)?.is_truthy() {
+                    self.visit_stmt(body)?;
+                }
+            }
         }
 
         Ok(())
