@@ -149,6 +149,20 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
                 self.environment = current; // Restore current environment
             }
+
+            Stmt::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                let condition = self.visit_expr(condition)?;
+
+                if condition.is_truthy() {
+                    self.visit_stmt(then_branch)?;
+                } else if let Some(else_branch) = else_branch {
+                    self.visit_stmt(else_branch)?;
+                }
+            }
         }
 
         Ok(())
