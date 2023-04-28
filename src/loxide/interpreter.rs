@@ -292,6 +292,25 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     })
                 }
             }
+
+            Expr::Logical {
+                left,
+                operator,
+                right,
+            } => {
+                let left = self.visit_expr(left)?;
+
+                // Short-circuit based on the operator
+                if operator.get_token_type() == TokenType::Or {
+                    if left.is_truthy() {
+                        return Ok(left);
+                    }
+                } else if !left.is_truthy() {
+                    return Ok(left);
+                }
+
+                self.visit_expr(right)
+            }
         }
     }
 }
