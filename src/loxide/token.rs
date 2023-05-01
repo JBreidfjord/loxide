@@ -19,7 +19,7 @@ impl Token {
     }
 
     pub fn get_token_type(&self) -> TokenType {
-        self.token_type.to_owned()
+        self.token_type.clone()
     }
 
     pub fn get_line(&self) -> usize {
@@ -27,7 +27,7 @@ impl Token {
     }
 
     pub fn get_lexeme(&self) -> String {
-        self.lexeme.to_owned()
+        self.lexeme.clone()
     }
 }
 

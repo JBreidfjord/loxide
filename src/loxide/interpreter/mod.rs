@@ -113,7 +113,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     Some(expr) => self.visit_expr(expr)?,
                     None => Value::Nil,
                 };
-                self.environment.define(name.get_lexeme(), value)
+                self.environment.define(name.get_lexeme(), value);
             }
 
             Stmt::Block(statements) => {

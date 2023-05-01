@@ -37,7 +37,7 @@ impl TryFrom<&Literal> for Value {
             Literal::Nil => Ok(Value::Nil),
             Literal::Bool(b) => Ok(Value::Bool(*b)),
             Literal::Number(n) => Ok(Value::Number(*n)),
-            Literal::String(s) => Ok(Value::String(s.to_owned())),
+            Literal::String(s) => Ok(Value::String(s.clone())),
         }
     }
 }
