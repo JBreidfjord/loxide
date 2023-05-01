@@ -125,11 +125,24 @@ impl Parser {
             TokenType::While => self.while_statement(),
             TokenType::For => self.for_statement(),
             TokenType::Break => self.break_statement(),
+            TokenType::Return => self.return_statement(),
             _ => {
                 self.restore(); // restore the previous token so we can parse it as an expression
                 self.expression_statement()
             }
         }
+    }
+
+    fn return_statement(&mut self) -> Result<Stmt> {
+        let keyword = self.previous();
+        // No value if the next token is a semicolon
+        let value = if self.check(&TokenType::Semicolon) {
+            None
+        } else {
+            Some(self.expression()?)
+        };
+        self.consume(&TokenType::Semicolon, "Expect ';' after return value.")?;
+        Ok(Stmt::Return { keyword, value })
     }
 
     fn break_statement(&mut self) -> Result<Stmt> {

@@ -52,6 +52,10 @@ pub enum Stmt {
     },
     Break,
     Function(Function),
+    Return {
+        keyword: Token,
+        value: Option<Expr>,
+    },
 }
 
 #[derive(Debug, Clone)]

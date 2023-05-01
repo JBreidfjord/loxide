@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::loxide::{ast::Stmt, token::Token};
 
-use super::{value::Value, Interpreter, Result};
+use super::{value::Value, Error, Interpreter, Result};
 
 pub trait Callable {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> Result<Value>;
@@ -51,9 +51,11 @@ impl Callable for Function {
             environment.define(param.get_lexeme(), arg);
         }
 
-        interpreter.execute_block(&self.body, environment)?;
-
-        Ok(Value::Nil)
+        match interpreter.execute_block(&self.body, environment) {
+            Err(Error::Return(value)) => Ok(value),
+            Ok(_) => Ok(Value::Nil),
+            Err(e) => Err(e),
+        }
     }
 }
 

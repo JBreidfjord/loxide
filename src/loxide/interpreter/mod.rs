@@ -60,6 +60,9 @@ pub enum Error {
 
     #[error(transparent)]
     SystemTimeError(#[from] time::SystemTimeError),
+
+    #[error("Return statement outside of function.")]
+    Return(Value),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -164,6 +167,14 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     function.name.get_lexeme(),
                     Value::Function(function.clone()),
                 );
+            }
+
+            Stmt::Return { value, .. } => {
+                let value = match value {
+                    Some(expr) => self.visit_expr(expr)?,
+                    None => Value::Nil,
+                };
+                return Err(Error::Return(value));
             }
         }
 
