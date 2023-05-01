@@ -31,6 +31,7 @@ pub enum TokenType {
     Number(f64),
     // Keywords
     And,
+    Break,
     Class,
     Else,
     False,
@@ -54,6 +55,7 @@ lazy_static! {
     pub static ref KEYWORDS: HashMap<String, TokenType> = {
         let mut m = HashMap::new();
         m.insert("and".to_string(), TokenType::And);
+        m.insert("break".to_string(), TokenType::Break);
         m.insert("class".to_string(), TokenType::Class);
         m.insert("else".to_string(), TokenType::Else);
         m.insert("false".to_string(), TokenType::False);
@@ -99,6 +101,7 @@ impl fmt::Display for TokenType {
             Self::String(s) => write!(f, "{}", s),
             Self::Number(n) => write!(f, "{}", n),
             Self::And => write!(f, "and"),
+            Self::Break => write!(f, "break"),
             Self::Class => write!(f, "class"),
             Self::Else => write!(f, "else"),
             Self::False => write!(f, "false"),

@@ -39,6 +39,9 @@ pub enum Error {
 
     #[error("Undefined variable {name}.")]
     UndefinedVariable { name: String },
+
+    #[error("Break statement outside of loop.")]
+    Break,
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -149,6 +152,31 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
                 self.environment = current; // Restore current environment
             }
+
+            Stmt::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                let condition = self.visit_expr(condition)?;
+
+                if condition.is_truthy() {
+                    self.visit_stmt(then_branch)?;
+                } else if let Some(else_branch) = else_branch {
+                    self.visit_stmt(else_branch)?;
+                }
+            }
+
+            Stmt::While { condition, body } => {
+                while self.visit_expr(condition)?.is_truthy() {
+                    match self.visit_stmt(body) {
+                        Err(Error::Break) => break,
+                        result => result?,
+                    };
+                }
+            }
+
+            Stmt::Break => return Err(Error::Break),
         }
 
         Ok(())
@@ -277,6 +305,25 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                         name: name.get_lexeme(),
                     })
                 }
+            }
+
+            Expr::Logical {
+                left,
+                operator,
+                right,
+            } => {
+                let left = self.visit_expr(left)?;
+
+                // Short-circuit based on the operator
+                if operator.get_token_type() == TokenType::Or {
+                    if left.is_truthy() {
+                        return Ok(left);
+                    }
+                } else if !left.is_truthy() {
+                    return Ok(left);
+                }
+
+                self.visit_expr(right)
             }
         }
     }
