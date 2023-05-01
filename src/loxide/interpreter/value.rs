@@ -2,7 +2,10 @@ use std::fmt;
 
 use crate::loxide::ast::Literal;
 
-use super::{functions::NativeFunction, Error};
+use super::{
+    functions::{Function, NativeFunction},
+    Error,
+};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -11,6 +14,7 @@ pub enum Value {
     Bool(bool),
     String(String),
     NativeFunction(NativeFunction),
+    Function(Function),
 }
 
 impl Value {
@@ -25,6 +29,7 @@ impl Value {
             Self::Bool(_) => String::from("Bool"),
             Self::String(_) => String::from("String"),
             Self::NativeFunction(_) => String::from("<native fn>"),
+            Self::Function(_) => String::from("<fn>"),
         }
     }
 }
@@ -60,8 +65,9 @@ impl fmt::Display for Value {
             Self::Nil => write!(f, "nil"),
             Self::Bool(b) => b.fmt(f),
             Self::Number(n) => n.fmt(f),
-            Self::String(s) => write!(f, "{:?}", s),
-            Self::NativeFunction(nf) => write!(f, "{}", nf.name),
+            Self::String(s) => write!(f, "{}", s),
+            Self::NativeFunction(nf) => write!(f, "{:?}", nf),
+            Self::Function(func) => write!(f, "{:?}", func),
         }
     }
 }

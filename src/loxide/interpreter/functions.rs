@@ -32,29 +32,26 @@ impl fmt::Debug for NativeFunction {
     }
 }
 
-pub struct FunctionDeclaration {
+#[derive(Clone)]
+pub struct Function {
     pub name: Token,
     pub params: Vec<Token>,
     pub body: Vec<Stmt>,
 }
 
-pub struct Function {
-    declaration: FunctionDeclaration,
-}
-
 impl Callable for Function {
     fn arity(&self) -> usize {
-        self.declaration.params.len()
+        self.params.len()
     }
 
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> Result<Value> {
         let mut environment = interpreter.globals.nest();
 
-        for (param, arg) in self.declaration.params.iter().zip(arguments) {
+        for (param, arg) in self.params.iter().zip(arguments) {
             environment.define(param.get_lexeme(), arg);
         }
 
-        interpreter.execute_block(&self.declaration.body, environment)?;
+        interpreter.execute_block(&self.body, environment)?;
 
         Ok(Value::Nil)
     }
@@ -62,6 +59,6 @@ impl Callable for Function {
 
 impl fmt::Debug for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<fn `{}`>", self.declaration.name.get_lexeme())
+        write!(f, "<fn `{}`>", self.name.get_lexeme())
     }
 }

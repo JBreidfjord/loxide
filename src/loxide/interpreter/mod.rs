@@ -159,8 +159,11 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
             Stmt::Break => return Err(Error::Break),
 
-            Stmt::Function(declaration) => {
-                todo!("Interpret function statement")
+            Stmt::Function(function) => {
+                self.environment.define(
+                    function.name.get_lexeme(),
+                    Value::Function(function.clone()),
+                );
             }
         }
 
@@ -169,10 +172,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
     fn visit_expr(&mut self, expr: &Expr) -> Result<Value> {
         match expr {
-            Expr::Literal(literal) => {
-                let value = Value::try_from(literal)?;
-                Ok(value)
-            }
+            Expr::Literal(literal) => Value::try_from(literal),
 
             Expr::Grouping(expr) => self.visit_expr(expr),
 
@@ -320,6 +320,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
                 let callable: Box<dyn Callable> = match callee {
                     Value::NativeFunction(function) => Box::new(function),
+                    Value::Function(function) => Box::new(function),
                     _ => return Err(Error::NotCallable { value: callee }),
                 };
 

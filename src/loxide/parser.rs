@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use super::{
     ast::{Expr, Literal, Stmt},
-    interpreter::functions::FunctionDeclaration,
+    interpreter::functions::Function,
     token::Token,
     token_type::TokenType,
 };
@@ -92,12 +92,12 @@ impl Parser {
         self.consume(&TokenType::RightParen, "Expect ')' after parameters.")?;
 
         self.consume(
-            &TokenType::RightBrace,
+            &TokenType::LeftBrace,
             &format!("Expect '{{' before {} body.", kind),
         )?;
         let body = self.block()?;
 
-        Ok(Stmt::Function(FunctionDeclaration { name, params, body }))
+        Ok(Stmt::Function(Function { name, params, body }))
     }
 
     fn var_declaration(&mut self) -> Result<Stmt> {
