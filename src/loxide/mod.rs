@@ -5,7 +5,6 @@ use thiserror::Error;
 use self::{interpreter::Interpreter, parser::Parser, scanner::Scanner};
 
 mod ast;
-mod environment;
 mod interpreter;
 mod parser;
 mod scanner;

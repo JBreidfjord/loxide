@@ -1,13 +1,22 @@
-use std::fmt;
+use std::time;
 
 use thiserror::Error;
 
-use super::{
-    ast::{Expr, Literal, Stmt, Visitor},
+use self::{
     environment::Environment,
+    functions::{Callable, NativeFunction},
+    value::Value,
+};
+
+use super::{
+    ast::{Expr, Stmt, Visitor},
     token::Token,
     token_type::TokenType,
 };
+
+mod environment;
+mod functions;
+mod value;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -48,82 +57,37 @@ pub enum Error {
 
     #[error("Expected {expected} arguments but found {found}.")]
     InvalidArgumentCount { expected: usize, found: usize },
+
+    #[error(transparent)]
+    SystemTimeError(#[from] time::SystemTimeError),
 }
 
-type Result<T, E = Error> = std::result::Result<T, E>;
-
-#[derive(Debug, Clone)]
-pub enum Value {
-    Nil,
-    Number(f64),
-    Bool(bool),
-    String(String),
-}
-
-impl Value {
-    fn is_truthy(&self) -> bool {
-        !matches!(self, Self::Nil | Self::Bool(false))
-    }
-
-    fn type_of(&self) -> String {
-        match self {
-            Self::Nil => String::from("Nil"),
-            Self::Number(_) => String::from("Number"),
-            Self::Bool(_) => String::from("Bool"),
-            Self::String(_) => String::from("String"),
-        }
-    }
-}
-
-impl TryFrom<&Literal> for Value {
-    type Error = Error;
-
-    fn try_from(literal: &Literal) -> Result<Self, Self::Error> {
-        match literal {
-            Literal::Nil => Ok(Value::Nil),
-            Literal::Bool(b) => Ok(Value::Bool(*b)),
-            Literal::Number(n) => Ok(Value::Number(*n)),
-            Literal::String(s) => Ok(Value::String(s.to_owned())),
-        }
-    }
-}
-
-impl PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Number(left), Self::Number(right)) => left == right,
-            (Self::Bool(left), Self::Bool(right)) => left == right,
-            (Self::String(left), Self::String(right)) => left == right,
-            (Self::Nil, Self::Nil) => true,
-            _ => false,
-        }
-    }
-}
-
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Nil => write!(f, "nil"),
-            Self::Bool(b) => b.fmt(f),
-            Self::Number(n) => n.fmt(f),
-            Self::String(s) => write!(f, "{:?}", s),
-        }
-    }
-}
-
-trait Callable {
-    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> Result<Value>;
-    fn arity(&self) -> usize;
-}
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct Interpreter {
+    globals: Environment,
     environment: Environment,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
+        let mut globals = Environment::global();
+
+        // Define the clock native function
+        globals.define(
+            "clock".to_string(),
+            Value::NativeFunction(NativeFunction::new("clock".to_string(), 0, |_, _| {
+                Ok(Value::Number(
+                    time::SystemTime::now()
+                        .duration_since(time::UNIX_EPOCH)?
+                        .as_secs_f64(),
+                ))
+            })),
+        );
+
         Self {
-            environment: Environment::global(),
+            globals: globals.clone(),
+            environment: globals,
         }
     }
 
@@ -339,13 +303,13 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
             Expr::Call {
                 callee,
-                paren,
+                paren: _,
                 arguments,
             } => {
                 let callee = self.visit_expr(callee)?;
 
                 let callable: Box<dyn Callable> = match callee {
-                    // TODO: Add match arms for other types of callables
+                    Value::NativeFunction(function) => Box::new(function),
                     _ => return Err(Error::NotCallable { value: callee }),
                 };
 

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use super::interpreter::Value;
+use super::value::Value;
 
 // Cactus stack / parent-pointer tree
 // Based on https://stackoverflow.com/a/48298865
