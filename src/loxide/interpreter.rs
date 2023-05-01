@@ -42,6 +42,12 @@ pub enum Error {
 
     #[error("Break statement outside of loop.")]
     Break,
+
+    #[error("Cannot call non-callable value of type {}.", .value.type_of())]
+    NotCallable { value: Value },
+
+    #[error("Expected {expected} arguments but found {found}.")]
+    InvalidArgumentCount { expected: usize, found: usize },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -103,6 +109,11 @@ impl fmt::Display for Value {
             Self::String(s) => write!(f, "{:?}", s),
         }
     }
+}
+
+trait Callable {
+    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> Result<Value>;
+    fn arity(&self) -> usize;
 }
 
 pub struct Interpreter {
@@ -324,6 +335,33 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 }
 
                 self.visit_expr(right)
+            }
+
+            Expr::Call {
+                callee,
+                paren,
+                arguments,
+            } => {
+                let callee = self.visit_expr(callee)?;
+
+                let callable: Box<dyn Callable> = match callee {
+                    // TODO: Add match arms for other types of callables
+                    _ => return Err(Error::NotCallable { value: callee }),
+                };
+
+                let arguments = arguments
+                    .iter()
+                    .map(|argument| self.visit_expr(argument))
+                    .collect::<Result<Vec<_>>>()?;
+
+                if arguments.len() != callable.arity() {
+                    return Err(Error::InvalidArgumentCount {
+                        expected: callable.arity(),
+                        found: arguments.len(),
+                    });
+                }
+
+                callable.call(self, arguments)
             }
         }
     }
