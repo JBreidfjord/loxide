@@ -80,11 +80,17 @@ impl Parser {
             TokenType::If => self.if_statement(),
             TokenType::While => self.while_statement(),
             TokenType::For => self.for_statement(),
+            TokenType::Break => self.break_statement(),
             _ => {
                 self.restore(); // restore the previous token so we can parse it as an expression
                 self.expression_statement()
             }
         }
+    }
+
+    fn break_statement(&mut self) -> Result<Stmt> {
+        self.consume(TokenType::Semicolon, "Expect ';' after 'break'.")?;
+        Ok(Stmt::Break)
     }
 
     fn for_statement(&mut self) -> Result<Stmt> {

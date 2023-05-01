@@ -39,6 +39,9 @@ pub enum Error {
 
     #[error("Undefined variable {name}.")]
     UndefinedVariable { name: String },
+
+    #[error("Break statement outside of loop.")]
+    Break,
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -166,9 +169,14 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
             Stmt::While { condition, body } => {
                 while self.visit_expr(condition)?.is_truthy() {
-                    self.visit_stmt(body)?;
+                    match self.visit_stmt(body) {
+                        Err(Error::Break) => break,
+                        result => result?,
+                    };
                 }
             }
+
+            Stmt::Break => return Err(Error::Break),
         }
 
         Ok(())
