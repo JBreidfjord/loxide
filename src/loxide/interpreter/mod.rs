@@ -15,7 +15,7 @@ use super::{
 };
 
 mod environment;
-mod functions;
+pub mod functions;
 mod value;
 
 #[derive(Debug, Error)]
@@ -76,13 +76,17 @@ impl Interpreter {
         // Define the clock native function
         globals.define(
             "clock".to_string(),
-            Value::NativeFunction(NativeFunction::new("clock".to_string(), 0, |_, _| {
-                Ok(Value::Number(
-                    time::SystemTime::now()
-                        .duration_since(time::UNIX_EPOCH)?
-                        .as_secs_f64(),
-                ))
-            })),
+            Value::NativeFunction(NativeFunction {
+                name: "clock".to_string(),
+                arity: 0,
+                function: |_, _| {
+                    Ok(Value::Number(
+                        time::SystemTime::now()
+                            .duration_since(time::UNIX_EPOCH)?
+                            .as_secs_f64(),
+                    ))
+                },
+            }),
         );
 
         Self {
@@ -96,6 +100,18 @@ impl Interpreter {
             self.visit_stmt(stmt)?;
         }
         Ok(())
+    }
+
+    pub fn execute_block(&mut self, statements: &[Stmt], environment: Environment) -> Result<()> {
+        let current = self.environment.clone(); // Store current environment
+
+        // Set environment for the block and visit each statement
+        self.environment = environment;
+        let result = statements.iter().try_for_each(|stmt| self.visit_stmt(stmt));
+
+        self.environment = current; // Restore current environment
+
+        result // Return result of block
     }
 }
 
@@ -116,17 +132,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 self.environment.define(name.get_lexeme(), value);
             }
 
-            Stmt::Block(statements) => {
-                let current = self.environment.clone(); // Store current environment
-
-                // Create a new environment for the block and visit each statement
-                self.environment = self.environment.nest();
-                for stmt in statements {
-                    self.visit_stmt(stmt)?;
-                }
-
-                self.environment = current; // Restore current environment
-            }
+            Stmt::Block(statements) => self.execute_block(statements, self.environment.nest())?,
 
             Stmt::If {
                 condition,
@@ -152,6 +158,10 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
             }
 
             Stmt::Break => return Err(Error::Break),
+
+            Stmt::Function(declaration) => {
+                todo!("Interpret function statement")
+            }
         }
 
         Ok(())

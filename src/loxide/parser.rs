@@ -2,6 +2,7 @@ use thiserror::Error;
 
 use super::{
     ast::{Expr, Literal, Stmt},
+    interpreter::functions::FunctionDeclaration,
     token::Token,
     token_type::TokenType,
 };
@@ -46,10 +47,14 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Result<Stmt> {
-        let result = if self.match_token(&[TokenType::Var]) {
-            self.var_declaration()
-        } else {
-            self.statement()
+        let previous = self.advance(); // consume and return the current token
+        let result = match previous.get_token_type() {
+            TokenType::Fn => self.function("function"),
+            TokenType::Var => self.var_declaration(),
+            _ => {
+                self.restore(); // restore the previous token so we can parse it as a statement
+                self.statement()
+            }
         };
 
         // Synchronize on error
@@ -57,6 +62,42 @@ impl Parser {
             self.synchronize();
         }
         result
+    }
+
+    fn function(&mut self, kind: &str) -> Result<Stmt> {
+        let name = self.consume_identifier(&format!("Expect {} name.", kind))?;
+        self.consume(
+            &TokenType::LeftParen,
+            &format!("Expect '(' after {} name.", kind),
+        )?;
+
+        // Parse parameters, if any
+        let mut params = Vec::new();
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                if params.len() >= 255 {
+                    return Err(Error::TooManyArguments {
+                        line: self.peek().get_line(),
+                    });
+                }
+
+                params.push(self.consume_identifier("Expect parameter name.")?);
+
+                // If there are no more parameters, break out of the loop
+                if !self.match_token(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        self.consume(&TokenType::RightParen, "Expect ')' after parameters.")?;
+
+        self.consume(
+            &TokenType::RightBrace,
+            &format!("Expect '{{' before {} body.", kind),
+        )?;
+        let body = self.block()?;
+
+        Ok(Stmt::Function(FunctionDeclaration { name, params, body }))
     }
 
     fn var_declaration(&mut self) -> Result<Stmt> {

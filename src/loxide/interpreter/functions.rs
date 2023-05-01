@@ -1,8 +1,8 @@
 use std::fmt;
 
-use super::{value::Value, Interpreter, Result};
+use crate::loxide::{ast::Stmt, token::Token};
 
-type Function = fn(&mut Interpreter, Vec<Value>) -> Result<Value>;
+use super::{value::Value, Interpreter, Result};
 
 pub trait Callable {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> Result<Value>;
@@ -12,8 +12,8 @@ pub trait Callable {
 #[derive(Clone)]
 pub struct NativeFunction {
     pub name: String,
-    arity: usize,
-    function: Function,
+    pub arity: usize,
+    pub function: fn(&mut Interpreter, Vec<Value>) -> Result<Value>,
 }
 
 impl Callable for NativeFunction {
@@ -26,18 +26,42 @@ impl Callable for NativeFunction {
     }
 }
 
-impl NativeFunction {
-    pub fn new(name: String, arity: usize, function: Function) -> Self {
-        Self {
-            name,
-            arity,
-            function,
-        }
-    }
-}
-
 impl fmt::Debug for NativeFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<native fn `{}`>", self.name)
+    }
+}
+
+pub struct FunctionDeclaration {
+    pub name: Token,
+    pub params: Vec<Token>,
+    pub body: Vec<Stmt>,
+}
+
+pub struct Function {
+    declaration: FunctionDeclaration,
+}
+
+impl Callable for Function {
+    fn arity(&self) -> usize {
+        self.declaration.params.len()
+    }
+
+    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> Result<Value> {
+        let mut environment = interpreter.globals.nest();
+
+        for (param, arg) in self.declaration.params.iter().zip(arguments) {
+            environment.define(param.get_lexeme(), arg);
+        }
+
+        interpreter.execute_block(&self.declaration.body, environment)?;
+
+        Ok(Value::Nil)
+    }
+}
+
+impl fmt::Debug for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<fn `{}`>", self.declaration.name.get_lexeme())
     }
 }

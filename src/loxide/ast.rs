@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::token::Token;
+use super::{interpreter::functions::FunctionDeclaration, token::Token};
 
 pub enum Expr {
     Binary {
@@ -49,6 +49,7 @@ pub enum Stmt {
         body: Box<Stmt>,
     },
     Break,
+    Function(FunctionDeclaration),
 }
 
 #[derive(Debug)]
