@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use self::{
     environment::Environment,
-    functions::{Callable, NativeFunction},
+    functions::{Callable, Function, NativeFunction},
     value::Value,
 };
 
@@ -162,11 +162,13 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
             Stmt::Break => return Err(Error::Break),
 
-            Stmt::Function(function) => {
-                self.environment.define(
-                    function.name.get_lexeme(),
-                    Value::Function(function.clone()),
-                );
+            Stmt::Function(declaration) => {
+                let function = Function {
+                    declaration: declaration.clone(),
+                    closure: self.environment.clone(),
+                };
+                self.environment
+                    .define(declaration.name.get_lexeme(), Value::Function(function));
             }
 
             Stmt::Return { value, .. } => {

@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use super::{
     ast::{Expr, Literal, Stmt},
-    interpreter::functions::Function,
+    interpreter::functions::FunctionDeclaration,
     token::Token,
     token_type::TokenType,
 };
@@ -97,7 +97,7 @@ impl Parser {
         )?;
         let body = self.block()?;
 
-        Ok(Stmt::Function(Function { name, params, body }))
+        Ok(Stmt::Function(FunctionDeclaration { name, params, body }))
     }
 
     fn var_declaration(&mut self) -> Result<Stmt> {

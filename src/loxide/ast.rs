@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::{interpreter::functions::Function, token::Token};
+use super::{interpreter::functions::FunctionDeclaration, token::Token};
 
 #[derive(Clone)]
 pub enum Expr {
@@ -51,7 +51,7 @@ pub enum Stmt {
         body: Box<Stmt>,
     },
     Break,
-    Function(Function),
+    Function(FunctionDeclaration),
     Return {
         keyword: Token,
         value: Option<Expr>,
