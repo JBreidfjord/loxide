@@ -359,6 +359,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 let callable: Box<dyn Callable> = match callee {
                     Value::NativeFunction(function) => Box::new(function),
                     Value::Function(function) => Box::new(function),
+                    Value::Class(class) => Box::new(class),
                     _ => return Err(Error::NotCallable { value: callee }),
                 };
 
