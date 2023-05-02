@@ -114,6 +114,10 @@ impl Interpreter {
 
         result // Return result of block
     }
+
+    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
+        todo!("Implement variable resolution")
+    }
 }
 
 impl Visitor<Result<Value>, Result<()>> for Interpreter {
