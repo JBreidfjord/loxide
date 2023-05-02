@@ -231,7 +231,7 @@ impl Scanner {
         // Check if the identifier is a reserved keyword
         let text = self.substring(self.start, self.current)?;
         if let Some(token_type) = KEYWORDS.get(&text) {
-            Ok(token_type.to_owned())
+            Ok(token_type.clone())
         } else {
             Ok(TokenType::Identifier(text))
         }

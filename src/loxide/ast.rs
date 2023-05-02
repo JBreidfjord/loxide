@@ -1,7 +1,8 @@
 use std::fmt;
 
-use super::token::Token;
+use super::{interpreter::functions::FunctionDeclaration, token::Token};
 
+#[derive(Clone)]
 pub enum Expr {
     Binary {
         left: Box<Expr>,
@@ -24,8 +25,15 @@ pub enum Expr {
         operator: Token,
         right: Box<Expr>,
     },
+    Call {
+        callee: Box<Expr>,
+        paren: Token,
+        arguments: Vec<Expr>,
+    },
+    Lambda(FunctionDeclaration),
 }
 
+#[derive(Clone)]
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
@@ -44,9 +52,14 @@ pub enum Stmt {
         body: Box<Stmt>,
     },
     Break,
+    Function(FunctionDeclaration),
+    Return {
+        keyword: Token,
+        value: Option<Expr>,
+    },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     Nil,
     Number(f64),

@@ -2,6 +2,7 @@ use thiserror::Error;
 
 use super::{
     ast::{Expr, Literal, Stmt},
+    interpreter::functions::FunctionDeclaration,
     token::Token,
     token_type::TokenType,
 };
@@ -10,6 +11,9 @@ use super::{
 pub enum Error {
     #[error("[line {line}] {msg}")]
     Syntax { msg: String, line: usize },
+
+    #[error("[line {line}] Too many arguments in function call.")]
+    TooManyArguments { line: usize },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -43,10 +47,14 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Result<Stmt> {
-        let result = if self.match_token(&[TokenType::Var]) {
-            self.var_declaration()
-        } else {
-            self.statement()
+        let previous = self.advance(); // consume and return the current token
+        let result = match previous.get_token_type() {
+            TokenType::Fn => self.function_statement(),
+            TokenType::Var => self.var_declaration(),
+            _ => {
+                self.restore(); // restore the previous token so we can parse it as a statement
+                self.statement()
+            }
         };
 
         // Synchronize on error
@@ -54,6 +62,39 @@ impl Parser {
             self.synchronize();
         }
         result
+    }
+
+    fn function_statement(&mut self) -> Result<Stmt> {
+        if let TokenType::Identifier(_) = self.peek().get_token_type() {
+            // If the next token is an identifier, it's a named function declaration
+            self.function("function")
+        } else {
+            // Otherwise, it's an anonymous function declaration
+            let lambda = self.lambda()?;
+            self.consume(
+                &TokenType::Semicolon,
+                "Expect ';' after anonymous function expression statement.",
+            )?;
+            Ok(Stmt::Expression(lambda))
+        }
+    }
+
+    fn function(&mut self, kind: &str) -> Result<Stmt> {
+        let name = self.consume_identifier(&format!("Expect {} name.", kind))?;
+        self.consume(
+            &TokenType::LeftParen,
+            &format!("Expect '(' after {} name.", kind),
+        )?;
+
+        let params = self.parameters()?;
+
+        self.consume(
+            &TokenType::LeftBrace,
+            &format!("Expect '{{' before {} body.", kind),
+        )?;
+        let body = self.block()?;
+
+        Ok(Stmt::Function(FunctionDeclaration { name, params, body }))
     }
 
     fn var_declaration(&mut self) -> Result<Stmt> {
@@ -66,7 +107,7 @@ impl Parser {
         };
 
         self.consume(
-            TokenType::Semicolon,
+            &TokenType::Semicolon,
             "Expect ';' after variable declaration.",
         )?;
         Ok(Stmt::Var { name, initializer })
@@ -81,6 +122,7 @@ impl Parser {
             TokenType::While => self.while_statement(),
             TokenType::For => self.for_statement(),
             TokenType::Break => self.break_statement(),
+            TokenType::Return => self.return_statement(),
             _ => {
                 self.restore(); // restore the previous token so we can parse it as an expression
                 self.expression_statement()
@@ -88,13 +130,25 @@ impl Parser {
         }
     }
 
+    fn return_statement(&mut self) -> Result<Stmt> {
+        let keyword = self.previous();
+        // No value if the next token is a semicolon
+        let value = if self.check(&TokenType::Semicolon) {
+            None
+        } else {
+            Some(self.expression()?)
+        };
+        self.consume(&TokenType::Semicolon, "Expect ';' after return value.")?;
+        Ok(Stmt::Return { keyword, value })
+    }
+
     fn break_statement(&mut self) -> Result<Stmt> {
-        self.consume(TokenType::Semicolon, "Expect ';' after 'break'.")?;
+        self.consume(&TokenType::Semicolon, "Expect ';' after 'break'.")?;
         Ok(Stmt::Break)
     }
 
     fn for_statement(&mut self) -> Result<Stmt> {
-        self.consume(TokenType::LeftParen, "Expect '(' after 'for'.")?;
+        self.consume(&TokenType::LeftParen, "Expect '(' after 'for'.")?;
 
         // Parse initializer
         let initializer = if self.match_token(&[TokenType::Semicolon]) {
@@ -109,20 +163,21 @@ impl Parser {
         };
 
         // Parse condition, defaulting to true if omitted
-        let condition = if !self.check(&TokenType::Semicolon) {
-            self.expression()?
-        } else {
+        let condition = if self.check(&TokenType::Semicolon) {
             Expr::Literal(Literal::Bool(true))
+        } else {
+            self.expression()?
         };
-        self.consume(TokenType::Semicolon, "Expect ';' after loop condition.")?;
+        self.consume(&TokenType::Semicolon, "Expect ';' after loop condition.")?;
 
         // Parse increment
-        let increment = if !self.check(&TokenType::RightParen) {
-            Some(self.expression()?)
-        } else {
+        let increment = if self.check(&TokenType::RightParen) {
             None
+        } else {
+            Some(self.expression()?)
         };
-        self.consume(TokenType::RightParen, "Expect ')' after 'for' clauses.")?;
+
+        self.consume(&TokenType::RightParen, "Expect ')' after 'for' clauses.")?;
 
         // Parse loop body
         let mut body = self.statement()?;
@@ -144,16 +199,19 @@ impl Parser {
 
         // If there is an initializer, add it before the while loop
         if let Some(initializer) = initializer {
-            body = Stmt::Block(vec![initializer, body])
+            body = Stmt::Block(vec![initializer, body]);
         }
 
         Ok(body)
     }
 
     fn while_statement(&mut self) -> Result<Stmt> {
-        self.consume(TokenType::LeftParen, "Expect '(' after 'while'.")?;
+        self.consume(&TokenType::LeftParen, "Expect '(' after 'while'.")?;
         let condition = self.expression()?;
-        self.consume(TokenType::RightParen, "Expect ')' after 'while' condition.")?;
+        self.consume(
+            &TokenType::RightParen,
+            "Expect ')' after 'while' condition.",
+        )?;
         let body = self.statement()?;
 
         Ok(Stmt::While {
@@ -163,9 +221,9 @@ impl Parser {
     }
 
     fn if_statement(&mut self) -> Result<Stmt> {
-        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
+        self.consume(&TokenType::LeftParen, "Expect '(' after 'if'.")?;
         let condition = self.expression()?;
-        self.consume(TokenType::RightParen, "Expect ')' after 'if' condition.")?;
+        self.consume(&TokenType::RightParen, "Expect ')' after 'if' condition.")?;
 
         let then_branch = self.statement()?;
         let else_branch = if self.match_token(&[TokenType::Else]) {
@@ -188,24 +246,48 @@ impl Parser {
             statements.push(self.declaration()?);
         }
 
-        self.consume(TokenType::RightBrace, "Expect '}}' after block.")?;
+        self.consume(&TokenType::RightBrace, "Expect '}}' after block.")?;
         Ok(statements)
     }
 
     fn print_statement(&mut self) -> Result<Stmt> {
         let expr = self.expression()?;
-        self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
+        self.consume(&TokenType::Semicolon, "Expect ';' after expression.")?;
         Ok(Stmt::Print(expr))
     }
 
     fn expression_statement(&mut self) -> Result<Stmt> {
         let expr = self.expression()?;
-        self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
+        self.consume(&TokenType::Semicolon, "Expect ';' after expression.")?;
         Ok(Stmt::Expression(expr))
     }
 
     fn expression(&mut self) -> Result<Expr> {
-        self.assignment()
+        if self.match_token(&[TokenType::Fn]) {
+            self.lambda()
+        } else {
+            self.assignment()
+        }
+    }
+
+    fn lambda(&mut self) -> Result<Expr> {
+        // Create a synthetic token for the anonymous function
+        let name = Token::new(
+            TokenType::Identifier(String::from("<anonymous>")),
+            String::from("<anonymous>"),
+            self.previous().get_line(), // use the line of the `fn` keyword
+        );
+
+        self.consume(&TokenType::LeftParen, "Expect '(' after anonymous `fn`.")?;
+        let params = self.parameters()?;
+
+        self.consume(
+            &TokenType::LeftBrace,
+            "Expect '{{' before anonymous `fn` body.",
+        )?;
+        let body = self.block()?;
+
+        Ok(Expr::Lambda(FunctionDeclaration { name, params, body }))
     }
 
     fn assignment(&mut self) -> Result<Expr> {
@@ -340,8 +422,52 @@ impl Parser {
                 right: Box::new(right),
             })
         } else {
-            self.primary()
+            self.call()
         }
+    }
+
+    fn call(&mut self) -> Result<Expr> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.match_token(&[TokenType::LeftParen]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr> {
+        let mut arguments = Vec::new();
+
+        // Parse arguments if there are any
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                if arguments.len() >= 255 {
+                    return Err(Error::TooManyArguments {
+                        line: self.peek().get_line(),
+                    });
+                }
+
+                arguments.push(self.expression()?);
+
+                // If there are no more arguments, break
+                if !self.match_token(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        let paren = self.consume(&TokenType::RightParen, "Expect ')' after arguments.")?;
+
+        Ok(Expr::Call {
+            callee: Box::new(callee),
+            paren,
+            arguments,
+        })
     }
 
     fn primary(&mut self) -> Result<Expr> {
@@ -357,7 +483,7 @@ impl Parser {
 
             TokenType::LeftParen => {
                 let expr = self.expression()?;
-                self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
+                self.consume(&TokenType::RightParen, "Expect ')' after expression.")?;
                 Ok(Expr::Grouping(Box::new(expr)))
             }
 
@@ -366,6 +492,30 @@ impl Parser {
                 line: previous.get_line(),
             }),
         }
+    }
+
+    fn parameters(&mut self) -> Result<Vec<Token>> {
+        // Parse parameters, if any
+        let mut params = Vec::new();
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                if params.len() >= 255 {
+                    return Err(Error::TooManyArguments {
+                        line: self.peek().get_line(),
+                    });
+                }
+
+                params.push(self.consume_identifier("Expect parameter name.")?);
+
+                // If there are no more parameters, break out of the loop
+                if !self.match_token(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        self.consume(&TokenType::RightParen, "Expect ')' after parameters.")?;
+
+        Ok(params)
     }
 
     fn synchronize(&mut self) {
@@ -406,8 +556,12 @@ impl Parser {
         false
     }
 
-    fn consume<S: ToString>(&mut self, token_type: TokenType, message: S) -> Result<Token> {
-        if self.check(&token_type) {
+    fn consume<S: ToString + ?Sized>(
+        &mut self,
+        token_type: &TokenType,
+        message: &S,
+    ) -> Result<Token> {
+        if self.check(token_type) {
             Ok(self.advance())
         } else {
             Err(Error::Syntax {
@@ -417,7 +571,7 @@ impl Parser {
         }
     }
 
-    fn consume_identifier<S: ToString>(&mut self, message: S) -> Result<Token> {
+    fn consume_identifier<S: ToString + ?Sized>(&mut self, message: &S) -> Result<Token> {
         let error = Error::Syntax {
             msg: message.to_string(),
             line: self.peek().get_line(),
@@ -452,11 +606,11 @@ impl Parser {
     }
 
     fn peek(&self) -> Token {
-        self.tokens[self.current].to_owned()
+        self.tokens[self.current].clone()
     }
 
     fn previous(&self) -> Token {
-        self.tokens[self.current - 1].to_owned()
+        self.tokens[self.current - 1].clone()
     }
 
     fn is_at_end(&self) -> bool {

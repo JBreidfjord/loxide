@@ -1,13 +1,22 @@
-use std::fmt;
+use std::time;
 
 use thiserror::Error;
 
-use super::{
-    ast::{Expr, Literal, Stmt, Visitor},
+use self::{
     environment::Environment,
+    functions::{Callable, Function, NativeFunction},
+    value::Value,
+};
+
+use super::{
+    ast::{Expr, Stmt, Visitor},
     token::Token,
     token_type::TokenType,
 };
+
+mod environment;
+pub mod functions;
+mod value;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -42,68 +51,21 @@ pub enum Error {
 
     #[error("Break statement outside of loop.")]
     Break,
+
+    #[error("Cannot call non-callable value of type {}.", .value.type_of())]
+    NotCallable { value: Value },
+
+    #[error("Expected {expected} arguments but found {found}.")]
+    InvalidArgumentCount { expected: usize, found: usize },
+
+    #[error(transparent)]
+    SystemTimeError(#[from] time::SystemTimeError),
+
+    #[error("Return statement outside of function.")]
+    Return(Value),
 }
 
-type Result<T, E = Error> = std::result::Result<T, E>;
-
-#[derive(Debug, Clone)]
-pub enum Value {
-    Nil,
-    Number(f64),
-    Bool(bool),
-    String(String),
-}
-
-impl Value {
-    fn is_truthy(&self) -> bool {
-        !matches!(self, Self::Nil | Self::Bool(false))
-    }
-
-    fn type_of(&self) -> String {
-        match self {
-            Self::Nil => String::from("Nil"),
-            Self::Number(_) => String::from("Number"),
-            Self::Bool(_) => String::from("Bool"),
-            Self::String(_) => String::from("String"),
-        }
-    }
-}
-
-impl TryFrom<&Literal> for Value {
-    type Error = Error;
-
-    fn try_from(literal: &Literal) -> Result<Self, Self::Error> {
-        match literal {
-            Literal::Nil => Ok(Value::Nil),
-            Literal::Bool(b) => Ok(Value::Bool(*b)),
-            Literal::Number(n) => Ok(Value::Number(*n)),
-            Literal::String(s) => Ok(Value::String(s.to_owned())),
-        }
-    }
-}
-
-impl PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Number(left), Self::Number(right)) => left == right,
-            (Self::Bool(left), Self::Bool(right)) => left == right,
-            (Self::String(left), Self::String(right)) => left == right,
-            (Self::Nil, Self::Nil) => true,
-            _ => false,
-        }
-    }
-}
-
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Nil => write!(f, "nil"),
-            Self::Bool(b) => b.fmt(f),
-            Self::Number(n) => n.fmt(f),
-            Self::String(s) => write!(f, "{:?}", s),
-        }
-    }
-}
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct Interpreter {
     environment: Environment,
@@ -111,8 +73,26 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
+        let mut globals = Environment::global();
+
+        // Define the clock native function
+        globals.define(
+            "clock".to_string(),
+            Value::NativeFunction(NativeFunction {
+                name: "clock".to_string(),
+                arity: 0,
+                function: |_, _| {
+                    Ok(Value::Number(
+                        time::SystemTime::now()
+                            .duration_since(time::UNIX_EPOCH)?
+                            .as_secs_f64(),
+                    ))
+                },
+            }),
+        );
+
         Self {
-            environment: Environment::global(),
+            environment: globals,
         }
     }
 
@@ -121,6 +101,18 @@ impl Interpreter {
             self.visit_stmt(stmt)?;
         }
         Ok(())
+    }
+
+    pub fn execute_block(&mut self, statements: &[Stmt], environment: Environment) -> Result<()> {
+        let current = self.environment.clone(); // Store current environment
+
+        // Set environment for the block and visit each statement
+        self.environment = environment;
+        let result = statements.iter().try_for_each(|stmt| self.visit_stmt(stmt));
+
+        self.environment = current; // Restore current environment
+
+        result // Return result of block
     }
 }
 
@@ -138,20 +130,10 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     Some(expr) => self.visit_expr(expr)?,
                     None => Value::Nil,
                 };
-                self.environment.define(name.get_lexeme(), value)
+                self.environment.define(name.get_lexeme(), value);
             }
 
-            Stmt::Block(statements) => {
-                let current = self.environment.clone(); // Store current environment
-
-                // Create a new environment for the block and visit each statement
-                self.environment = self.environment.nest();
-                for stmt in statements {
-                    self.visit_stmt(stmt)?;
-                }
-
-                self.environment = current; // Restore current environment
-            }
+            Stmt::Block(statements) => self.execute_block(statements, self.environment.nest())?,
 
             Stmt::If {
                 condition,
@@ -177,6 +159,23 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
             }
 
             Stmt::Break => return Err(Error::Break),
+
+            Stmt::Function(declaration) => {
+                let function = Function {
+                    declaration: declaration.clone(),
+                    closure: self.environment.clone(),
+                };
+                self.environment
+                    .define(declaration.name.get_lexeme(), Value::Function(function));
+            }
+
+            Stmt::Return { value, .. } => {
+                let value = match value {
+                    Some(expr) => self.visit_expr(expr)?,
+                    None => Value::Nil,
+                };
+                return Err(Error::Return(value));
+            }
         }
 
         Ok(())
@@ -184,10 +183,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
     fn visit_expr(&mut self, expr: &Expr) -> Result<Value> {
         match expr {
-            Expr::Literal(literal) => {
-                let value = Value::try_from(literal)?;
-                Ok(value)
-            }
+            Expr::Literal(literal) => Value::try_from(literal),
 
             Expr::Grouping(expr) => self.visit_expr(expr),
 
@@ -325,6 +321,39 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
                 self.visit_expr(right)
             }
+
+            Expr::Call {
+                callee,
+                paren: _,
+                arguments,
+            } => {
+                let callee = self.visit_expr(callee)?;
+
+                let callable: Box<dyn Callable> = match callee {
+                    Value::NativeFunction(function) => Box::new(function),
+                    Value::Function(function) => Box::new(function),
+                    _ => return Err(Error::NotCallable { value: callee }),
+                };
+
+                let arguments = arguments
+                    .iter()
+                    .map(|argument| self.visit_expr(argument))
+                    .collect::<Result<Vec<_>>>()?;
+
+                if arguments.len() != callable.arity() {
+                    return Err(Error::InvalidArgumentCount {
+                        expected: callable.arity(),
+                        found: arguments.len(),
+                    });
+                }
+
+                callable.call(self, arguments)
+            }
+
+            Expr::Lambda(lambda) => Ok(Value::Function(Function {
+                declaration: lambda.clone(),
+                closure: self.environment.clone(),
+            })),
         }
     }
 }
