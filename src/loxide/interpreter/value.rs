@@ -1,5 +1,7 @@
 use std::fmt;
 
+use ordered_float::OrderedFloat;
+
 use crate::loxide::ast::Literal;
 
 use super::{
@@ -10,7 +12,7 @@ use super::{
 #[derive(Debug, Clone)]
 pub enum Value {
     Nil,
-    Number(f64),
+    Number(OrderedFloat<f64>),
     Bool(bool),
     String(String),
     NativeFunction(NativeFunction),

@@ -1,5 +1,6 @@
-use std::time;
+use std::{collections::HashMap, time};
 
+use ordered_float::OrderedFloat;
 use thiserror::Error;
 
 use self::{
@@ -69,10 +70,12 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct Interpreter {
     environment: Environment,
+    globals: Environment,
+    locals: HashMap<Expr, usize>,
 }
 
 impl Interpreter {
-    pub fn new() -> Self {
+    pub fn new(locals: HashMap<Expr, usize>) -> Self {
         let mut globals = Environment::global();
 
         // Define the clock native function
@@ -82,17 +85,19 @@ impl Interpreter {
                 name: "clock".to_string(),
                 arity: 0,
                 function: |_, _| {
-                    Ok(Value::Number(
+                    Ok(Value::Number(OrderedFloat(
                         time::SystemTime::now()
                             .duration_since(time::UNIX_EPOCH)?
                             .as_secs_f64(),
-                    ))
+                    )))
                 },
             }),
         );
 
         Self {
-            environment: globals,
+            environment: globals.clone(),
+            globals,
+            locals,
         }
     }
 
@@ -285,16 +290,27 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
             }
 
             Expr::Variable(name) => {
-                self.environment
-                    .lookup(name.get_lexeme())
-                    .ok_or(Error::UndefinedVariable {
-                        name: name.get_lexeme(),
-                    })
+                let value = if let Some(distance) = self.locals.get(expr) {
+                    self.environment.lookup_at(*distance, name.get_lexeme())
+                } else {
+                    self.globals.lookup(name.get_lexeme())
+                };
+
+                value.ok_or(Error::UndefinedVariable {
+                    name: name.get_lexeme(),
+                })
             }
 
             Expr::Assign { name, value } => {
                 let value = self.visit_expr(value)?;
-                if self.environment.assign(name.get_lexeme(), value.clone()) {
+                let result = if let Some(distance) = self.locals.get(expr) {
+                    self.environment
+                        .assign_at(*distance, name.get_lexeme(), value.clone())
+                } else {
+                    self.globals.assign(name.get_lexeme(), value.clone())
+                };
+
+                if result {
                     Ok(value)
                 } else {
                     Err(Error::UndefinedVariable {

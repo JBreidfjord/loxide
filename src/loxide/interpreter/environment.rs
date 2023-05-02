@@ -36,6 +36,10 @@ impl Environment {
         self.0.as_ref().map_or(Self(None), |s| s.enclosing.clone())
     }
 
+    fn ancestor(&self, distance: usize) -> Self {
+        (0..distance).fold(self.clone(), |env, _| env.enclosing())
+    }
+
     pub fn define(&mut self, name: String, value: Value) {
         if let Some(scope) = self.0.as_ref() {
             scope.variables.borrow_mut().insert(name, value);
@@ -55,6 +59,10 @@ impl Environment {
         None
     }
 
+    pub fn lookup_at(&self, distance: usize, name: String) -> Option<Value> {
+        self.ancestor(distance).lookup(name)
+    }
+
     pub fn assign(&mut self, name: String, value: Value) -> bool {
         if let Some(scope) = self.0.as_ref() {
             if scope.variables.borrow().contains_key(&name) {
@@ -67,5 +75,9 @@ impl Environment {
             return self.enclosing().assign(name, value);
         }
         false
+    }
+
+    pub fn assign_at(&mut self, distance: usize, name: String, value: Value) -> bool {
+        self.ancestor(distance).assign(name, value)
     }
 }

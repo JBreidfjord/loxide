@@ -2,11 +2,12 @@ use std::io::Write;
 
 use thiserror::Error;
 
-use self::{interpreter::Interpreter, parser::Parser, scanner::Scanner};
+use self::{interpreter::Interpreter, parser::Parser, resolver::Resolver, scanner::Scanner};
 
 mod ast;
 mod interpreter;
 mod parser;
+mod resolver;
 mod scanner;
 mod token;
 mod token_type;
@@ -19,6 +20,9 @@ pub enum Error {
     #[error("{}Parsing failed, see errors above.", .0.iter().map(|e| format!("{}\n", e)).collect::<String>())]
     Parser(Vec<self::parser::Error>),
 
+    #[error("{}Variable resolution failed, see errors above.", .0.iter().map(|e| format!("{}\n", e)).collect::<String>())]
+    Resolver(Vec<self::resolver::Error>),
+
     #[error(transparent)]
     Runtime(#[from] self::interpreter::Error),
 
@@ -28,15 +32,11 @@ pub enum Error {
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
-pub struct Loxide {
-    interpreter: Interpreter,
-}
+pub struct Loxide;
 
 impl Loxide {
     pub fn new() -> Self {
-        Self {
-            interpreter: Interpreter::new(),
-        }
+        Self
     }
 
     fn run(&mut self, source: Vec<u8>) -> Result {
@@ -46,9 +46,10 @@ impl Loxide {
         let mut parser = Parser::new(tokens);
         let statements = parser.parse().map_err(Error::Parser)?;
 
-        self.interpreter
-            .interpret(&statements)
-            .map_err(Error::Runtime)
+        let locals = Resolver::new().run(&statements).map_err(Error::Resolver)?;
+
+        let mut interpreter = Interpreter::new(locals);
+        interpreter.interpret(&statements).map_err(Error::Runtime)
     }
 
     pub fn run_file(&mut self, path: &str) -> Result {
