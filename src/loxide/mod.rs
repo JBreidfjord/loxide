@@ -2,7 +2,7 @@ use std::io::Write;
 
 use thiserror::Error;
 
-use self::{interpreter::Interpreter, parser::Parser, scanner::Scanner};
+use self::{interpreter::Interpreter, parser::Parser, resolver::Resolver, scanner::Scanner};
 
 mod ast;
 mod interpreter;
@@ -19,6 +19,9 @@ pub enum Error {
 
     #[error("{}Parsing failed, see errors above.", .0.iter().map(|e| format!("{}\n", e)).collect::<String>())]
     Parser(Vec<self::parser::Error>),
+
+    #[error("{}Variable resolution failed, see errors above.", .0.iter().map(|e| format!("{}\n", e)).collect::<String>())]
+    Resolver(Vec<self::resolver::Error>),
 
     #[error(transparent)]
     Runtime(#[from] self::interpreter::Error),
@@ -46,6 +49,9 @@ impl Loxide {
 
         let mut parser = Parser::new(tokens);
         let statements = parser.parse().map_err(Error::Parser)?;
+
+        let mut resolver = Resolver::new(self.interpreter);
+        resolver.run(&statements).map_err(Error::Resolver)?;
 
         self.interpreter
             .interpret(&statements)

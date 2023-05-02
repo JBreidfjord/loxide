@@ -12,20 +12,34 @@ use super::{
 pub enum Error {
     #[error("Can't read local variable in its own initializer.")]
     SelfReferencedInitializer,
+
+    #[error("A variable with name `{name}` was already declared in this scope.")]
+    VariableAlreadyDeclared { name: String },
+
+    #[error("Can't return from top-level code.")]
+    ReturnOutsideFunction,
 }
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
+#[derive(PartialEq)]
+enum FnType {
+    None,
+    Function,
+}
+
 pub struct Resolver {
     interpreter: Interpreter,
     scopes: Vec<HashMap<String, bool>>,
+    current_fn: FnType,
 }
 
 impl Resolver {
-    pub fn new() -> Self {
+    pub fn new(interpreter: Interpreter) -> Self {
         Self {
-            interpreter: Interpreter::new(),
+            interpreter,
             scopes: Vec::new(),
+            current_fn: FnType::None,
         }
     }
 
@@ -37,7 +51,23 @@ impl Resolver {
         self.scopes.pop();
     }
 
-    fn resolve(&mut self, statements: &[Stmt]) -> Result {
+    pub fn run(&mut self, statements: &[Stmt]) -> Result<(), Vec<Error>> {
+        let mut errors = Vec::new();
+        for stmt in statements {
+            match self.visit_stmt(stmt) {
+                Ok(_) => (),
+                Err(err) => errors.push(err),
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    pub fn resolve(&mut self, statements: &[Stmt]) -> Result {
         for stmt in statements {
             self.visit_stmt(stmt)?;
         }
@@ -56,7 +86,11 @@ impl Resolver {
 
     fn declare(&mut self, name: &Token) -> Result {
         if let Some(scope) = self.scopes.last_mut() {
-            scope.insert(name.get_lexeme(), false);
+            let lexeme = name.get_lexeme();
+            if scope.contains_key(&lexeme) {
+                return Err(Error::VariableAlreadyDeclared { name: lexeme });
+            }
+            scope.insert(lexeme, false);
         }
         Ok(())
     }
@@ -68,7 +102,10 @@ impl Resolver {
         Ok(())
     }
 
-    fn resolve_function(&mut self, declaration: &FunctionDeclaration) -> Result {
+    fn resolve_function(&mut self, declaration: &FunctionDeclaration, fn_type: FnType) -> Result {
+        let enclosing_fn = self.current_fn;
+        self.current_fn = fn_type;
+
         self.begin_scope();
         for param in &declaration.params {
             self.declare(param)?;
@@ -120,7 +157,7 @@ impl Visitor<Result, Result> for Resolver {
 
             Expr::Unary { right, .. } => self.visit_expr(right),
 
-            Expr::Lambda(declaration) => self.resolve_function(declaration),
+            Expr::Lambda(declaration) => self.resolve_function(declaration, FnType::Function),
         }
     }
 
@@ -145,7 +182,7 @@ impl Visitor<Result, Result> for Resolver {
             Stmt::Function(declaration) => {
                 self.declare(&declaration.name)?;
                 self.define(&declaration.name)?;
-                self.resolve_function(declaration)
+                self.resolve_function(declaration, FnType::Function)
             }
 
             Stmt::Expression(expr) => self.visit_expr(expr),
@@ -166,6 +203,10 @@ impl Visitor<Result, Result> for Resolver {
             Stmt::Print(expr) => self.visit_expr(expr),
 
             Stmt::Return { value, .. } => {
+                if self.current_fn == FnType::None {
+                    return Err(Error::ReturnOutsideFunction);
+                }
+
                 if let Some(value) = value {
                     self.visit_expr(value)?;
                 }
