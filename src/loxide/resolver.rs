@@ -211,6 +211,12 @@ impl Visitor<Result, Result> for Resolver {
             }
 
             Stmt::Break => Ok(()),
+
+            Stmt::Class { name, .. } => {
+                self.declare(name)?;
+                self.define(name);
+                Ok(())
+            }
         }
     }
 }

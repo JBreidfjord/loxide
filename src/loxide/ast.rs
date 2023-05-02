@@ -59,6 +59,10 @@ pub enum Stmt {
         keyword: Token,
         value: Option<Expr>,
     },
+    Class {
+        name: Token,
+        methods: Vec<FunctionDeclaration>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -4,6 +4,7 @@ use ordered_float::OrderedFloat;
 use thiserror::Error;
 
 use self::{
+    classes::Class,
     environment::Environment,
     functions::{Callable, Function, NativeFunction},
     value::Value,
@@ -15,6 +16,7 @@ use super::{
     token_type::TokenType,
 };
 
+mod classes;
 mod environment;
 pub mod functions;
 mod value;
@@ -180,6 +182,15 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     None => Value::Nil,
                 };
                 return Err(Error::Return(value));
+            }
+
+            Stmt::Class { name, .. } => {
+                self.environment.define(name.get_lexeme(), Value::Nil);
+                let class = Class {
+                    name: name.get_lexeme(),
+                };
+                self.environment
+                    .assign(name.get_lexeme(), Value::Class(class));
             }
         }
 

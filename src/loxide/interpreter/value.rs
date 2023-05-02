@@ -5,6 +5,7 @@ use ordered_float::OrderedFloat;
 use crate::loxide::ast::Literal;
 
 use super::{
+    classes::Class,
     functions::{Function, NativeFunction},
     Error,
 };
@@ -17,6 +18,7 @@ pub enum Value {
     String(String),
     NativeFunction(NativeFunction),
     Function(Function),
+    Class(Class),
 }
 
 impl Value {
@@ -32,6 +34,7 @@ impl Value {
             Self::String(_) => String::from("String"),
             Self::NativeFunction(_) => String::from("<native fn>"),
             Self::Function(_) => String::from("<fn>"),
+            Self::Class(_) => String::from("<class>"),
         }
     }
 }
@@ -70,6 +73,7 @@ impl fmt::Display for Value {
             Self::String(s) => write!(f, "{}", s),
             Self::NativeFunction(nf) => write!(f, "{:?}", nf),
             Self::Function(func) => write!(f, "{:?}", func),
+            Self::Class(class) => write!(f, "{:?}", class),
         }
     }
 }
