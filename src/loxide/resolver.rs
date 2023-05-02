@@ -97,7 +97,30 @@ impl Visitor<Result, Result> for Resolver {
                 self.resolve_local(expr, name)
             }
 
-            _ => todo!("Handle other expressions"),
+            Expr::Binary { left, right, .. } => {
+                self.visit_expr(left)?;
+                self.visit_expr(right)
+            }
+
+            Expr::Call {
+                callee, arguments, ..
+            } => {
+                self.visit_expr(callee)?;
+                arguments.iter().try_for_each(|arg| self.visit_expr(arg))
+            }
+
+            Expr::Grouping(expr) => self.visit_expr(expr),
+
+            Expr::Literal(_) => Ok(()),
+
+            Expr::Logical { left, right, .. } => {
+                self.visit_expr(left)?;
+                self.visit_expr(right)
+            }
+
+            Expr::Unary { right, .. } => self.visit_expr(right),
+
+            Expr::Lambda(declaration) => self.resolve_function(declaration),
         }
     }
 
@@ -125,7 +148,36 @@ impl Visitor<Result, Result> for Resolver {
                 self.resolve_function(declaration)
             }
 
-            _ => todo!("Handle other statements"),
+            Stmt::Expression(expr) => self.visit_expr(expr),
+
+            Stmt::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                self.visit_expr(condition)?;
+                self.visit_stmt(then_branch)?;
+                if let Some(else_branch) = else_branch {
+                    self.visit_stmt(else_branch)?;
+                }
+                Ok(())
+            }
+
+            Stmt::Print(expr) => self.visit_expr(expr),
+
+            Stmt::Return { value, .. } => {
+                if let Some(value) = value {
+                    self.visit_expr(value)?;
+                }
+                Ok(())
+            }
+
+            Stmt::While { condition, body } => {
+                self.visit_expr(condition)?;
+                self.visit_stmt(body)
+            }
+
+            Stmt::Break => Ok(()),
         }
     }
 }
