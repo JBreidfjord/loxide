@@ -65,18 +65,17 @@ impl Parser {
     }
 
     fn function_statement(&mut self) -> Result<Stmt> {
-        match self.peek().get_token_type() {
+        if let TokenType::Identifier(_) = self.peek().get_token_type() {
             // If the next token is an identifier, it's a named function declaration
-            TokenType::Identifier(_) => self.function("function"),
+            self.function("function")
+        } else {
             // Otherwise, it's an anonymous function declaration
-            _ => {
-                let lambda = self.lambda()?;
-                self.consume(
-                    &TokenType::Semicolon,
-                    "Expect ';' after anonymous function expression statement.",
-                )?;
-                Ok(Stmt::Expression(lambda))
-            }
+            let lambda = self.lambda()?;
+            self.consume(
+                &TokenType::Semicolon,
+                "Expect ';' after anonymous function expression statement.",
+            )?;
+            Ok(Stmt::Expression(lambda))
         }
     }
 

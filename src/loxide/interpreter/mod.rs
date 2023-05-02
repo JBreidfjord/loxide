@@ -68,7 +68,6 @@ pub enum Error {
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct Interpreter {
-    globals: Environment,
     environment: Environment,
 }
 
@@ -93,7 +92,6 @@ impl Interpreter {
         );
 
         Self {
-            globals: globals.clone(),
             environment: globals,
         }
     }
