@@ -1,4 +1,4 @@
-use std::time;
+use std::{collections::HashMap, time};
 
 use thiserror::Error;
 
@@ -69,6 +69,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct Interpreter {
     environment: Environment,
+    locals: HashMap<Expr, usize>,
 }
 
 impl Interpreter {
@@ -93,6 +94,7 @@ impl Interpreter {
 
         Self {
             environment: globals,
+            locals: HashMap::new(),
         }
     }
 
@@ -116,7 +118,7 @@ impl Interpreter {
     }
 
     pub fn resolve(&mut self, expr: &Expr, depth: usize) {
-        todo!("Implement variable resolution")
+        self.locals.insert(expr.clone(), depth);
     }
 }
 

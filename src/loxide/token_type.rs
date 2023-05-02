@@ -1,8 +1,9 @@
 use std::{collections::HashMap, fmt};
 
 use lazy_static::lazy_static;
+use ordered_float::OrderedFloat;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TokenType {
     // Single-character tokens
     LeftParen,
@@ -28,7 +29,7 @@ pub enum TokenType {
     // Literals
     Identifier(String),
     String(String),
-    Number(f64),
+    Number(OrderedFloat<f64>),
     // Keywords
     And,
     Break,

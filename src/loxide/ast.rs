@@ -1,8 +1,10 @@
 use std::fmt;
 
+use ordered_float::OrderedFloat;
+
 use super::{interpreter::functions::FunctionDeclaration, token::Token};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     Binary {
         left: Box<Expr>,
@@ -33,7 +35,7 @@ pub enum Expr {
     Lambda(FunctionDeclaration),
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
@@ -59,10 +61,10 @@ pub enum Stmt {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Literal {
     Nil,
-    Number(f64),
+    Number(OrderedFloat<f64>),
     Bool(bool),
     String(String),
 }
