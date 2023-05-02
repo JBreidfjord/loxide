@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use super::{
     ast::{Expr, Stmt, Visitor},
-    interpreter::{functions::FunctionDeclaration, Interpreter},
+    interpreter::functions::FunctionDeclaration,
     token::Token,
 };
 
@@ -22,23 +22,23 @@ pub enum Error {
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Copy, Clone)]
 enum FnType {
     None,
     Function,
 }
 
 pub struct Resolver {
-    interpreter: Interpreter,
     scopes: Vec<HashMap<String, bool>>,
+    locals: HashMap<Expr, usize>,
     current_fn: FnType,
 }
 
 impl Resolver {
-    pub fn new(interpreter: Interpreter) -> Self {
+    pub fn new() -> Self {
         Self {
-            interpreter,
             scopes: Vec::new(),
+            locals: HashMap::new(),
             current_fn: FnType::None,
         }
     }
@@ -51,7 +51,7 @@ impl Resolver {
         self.scopes.pop();
     }
 
-    pub fn run(&mut self, statements: &[Stmt]) -> Result<(), Vec<Error>> {
+    pub fn run(mut self, statements: &[Stmt]) -> Result<HashMap<Expr, usize>, Vec<Error>> {
         let mut errors = Vec::new();
         for stmt in statements {
             match self.visit_stmt(stmt) {
@@ -61,24 +61,21 @@ impl Resolver {
         }
 
         if errors.is_empty() {
-            Ok(())
+            Ok(self.locals)
         } else {
             Err(errors)
         }
     }
 
     pub fn resolve(&mut self, statements: &[Stmt]) -> Result {
-        for stmt in statements {
-            self.visit_stmt(stmt)?;
-        }
-        Ok(())
+        statements.iter().try_for_each(|stmt| self.visit_stmt(stmt))
     }
 
     fn resolve_local(&mut self, expr: &Expr, name: &Token) -> Result {
         for (i, scope) in self.scopes.iter().enumerate().rev() {
             if scope.contains_key(&name.get_lexeme()) {
-                self.interpreter.resolve(expr, self.scopes.len() - 1 - i);
-                return Ok(());
+                let distance = self.scopes.len() - 1 - i;
+                self.locals.insert(expr.clone(), distance);
             }
         }
         Ok(())
@@ -113,6 +110,8 @@ impl Resolver {
         }
         self.resolve(&declaration.body)?;
         self.end_scope();
+
+        self.current_fn = enclosing_fn;
         Ok(())
     }
 }
@@ -175,8 +174,7 @@ impl Visitor<Result, Result> for Resolver {
                 if let Some(initializer) = initializer {
                     self.visit_expr(initializer)?;
                 }
-                self.define(name)?;
-                Ok(())
+                self.define(name)
             }
 
             Stmt::Function(declaration) => {

@@ -1,5 +1,6 @@
 use std::{collections::HashMap, time};
 
+use ordered_float::OrderedFloat;
 use thiserror::Error;
 
 use self::{
@@ -74,7 +75,7 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    pub fn new() -> Self {
+    pub fn new(locals: HashMap<Expr, usize>) -> Self {
         let mut globals = Environment::global();
 
         // Define the clock native function
@@ -84,11 +85,11 @@ impl Interpreter {
                 name: "clock".to_string(),
                 arity: 0,
                 function: |_, _| {
-                    Ok(Value::Number(
+                    Ok(Value::Number(OrderedFloat(
                         time::SystemTime::now()
                             .duration_since(time::UNIX_EPOCH)?
                             .as_secs_f64(),
-                    ))
+                    )))
                 },
             }),
         );
@@ -96,7 +97,7 @@ impl Interpreter {
         Self {
             environment: globals.clone(),
             globals,
-            locals: HashMap::new(),
+            locals,
         }
     }
 
@@ -117,10 +118,6 @@ impl Interpreter {
         self.environment = current; // Restore current environment
 
         result // Return result of block
-    }
-
-    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
-        self.locals.insert(expr.clone(), depth);
     }
 }
 
@@ -308,9 +305,9 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 let value = self.visit_expr(value)?;
                 let result = if let Some(distance) = self.locals.get(expr) {
                     self.environment
-                        .assign_at(*distance, name.get_lexeme(), value)
+                        .assign_at(*distance, name.get_lexeme(), value.clone())
                 } else {
-                    self.globals.assign(name.get_lexeme(), value)
+                    self.globals.assign(name.get_lexeme(), value.clone())
                 };
 
                 if result {

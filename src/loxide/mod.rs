@@ -32,15 +32,11 @@ pub enum Error {
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
-pub struct Loxide {
-    interpreter: Interpreter,
-}
+pub struct Loxide;
 
 impl Loxide {
     pub fn new() -> Self {
-        Self {
-            interpreter: Interpreter::new(),
-        }
+        Self
     }
 
     fn run(&mut self, source: Vec<u8>) -> Result {
@@ -50,12 +46,10 @@ impl Loxide {
         let mut parser = Parser::new(tokens);
         let statements = parser.parse().map_err(Error::Parser)?;
 
-        let mut resolver = Resolver::new(self.interpreter);
-        resolver.run(&statements).map_err(Error::Resolver)?;
+        let locals = Resolver::new().run(&statements).map_err(Error::Resolver)?;
 
-        self.interpreter
-            .interpret(&statements)
-            .map_err(Error::Runtime)
+        let mut interpreter = Interpreter::new(locals);
+        interpreter.interpret(&statements).map_err(Error::Runtime)
     }
 
     pub fn run_file(&mut self, path: &str) -> Result {

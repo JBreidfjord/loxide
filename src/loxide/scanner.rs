@@ -1,3 +1,4 @@
+use ordered_float::OrderedFloat;
 use thiserror::Error;
 
 use super::token::Token;
@@ -219,7 +220,7 @@ impl Scanner {
         }
 
         let value = self.substring(self.start, self.current)?.parse::<f64>()?;
-        Ok(TokenType::Number(value))
+        Ok(TokenType::Number(OrderedFloat(value)))
     }
 
     fn identifier(&mut self) -> Result<TokenType> {
