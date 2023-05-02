@@ -7,6 +7,7 @@ use self::{interpreter::Interpreter, parser::Parser, scanner::Scanner};
 mod ast;
 mod interpreter;
 mod parser;
+mod resolver;
 mod scanner;
 mod token;
 mod token_type;
