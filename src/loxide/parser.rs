@@ -49,7 +49,7 @@ impl Parser {
     fn declaration(&mut self) -> Result<Stmt> {
         let previous = self.advance(); // consume and return the current token
         let result = match previous.get_token_type() {
-            TokenType::Fn => self.function("function"),
+            TokenType::Fn => self.function_statement(),
             TokenType::Var => self.var_declaration(),
             _ => {
                 self.restore(); // restore the previous token so we can parse it as a statement
@@ -64,6 +64,22 @@ impl Parser {
         result
     }
 
+    fn function_statement(&mut self) -> Result<Stmt> {
+        match self.peek().get_token_type() {
+            // If the next token is an identifier, it's a named function declaration
+            TokenType::Identifier(_) => self.function("function"),
+            // Otherwise, it's an anonymous function declaration
+            _ => {
+                let lambda = self.lambda()?;
+                self.consume(
+                    &TokenType::Semicolon,
+                    "Expect ';' after anonymous function expression statement.",
+                )?;
+                Ok(Stmt::Expression(lambda))
+            }
+        }
+    }
+
     fn function(&mut self, kind: &str) -> Result<Stmt> {
         let name = self.consume_identifier(&format!("Expect {} name.", kind))?;
         self.consume(
@@ -71,25 +87,7 @@ impl Parser {
             &format!("Expect '(' after {} name.", kind),
         )?;
 
-        // Parse parameters, if any
-        let mut params = Vec::new();
-        if !self.check(&TokenType::RightParen) {
-            loop {
-                if params.len() >= 255 {
-                    return Err(Error::TooManyArguments {
-                        line: self.peek().get_line(),
-                    });
-                }
-
-                params.push(self.consume_identifier("Expect parameter name.")?);
-
-                // If there are no more parameters, break out of the loop
-                if !self.match_token(&[TokenType::Comma]) {
-                    break;
-                }
-            }
-        }
-        self.consume(&TokenType::RightParen, "Expect ')' after parameters.")?;
+        let params = self.parameters()?;
 
         self.consume(
             &TokenType::LeftBrace,
@@ -266,7 +264,31 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expr> {
-        self.assignment()
+        if self.match_token(&[TokenType::Fn]) {
+            self.lambda()
+        } else {
+            self.assignment()
+        }
+    }
+
+    fn lambda(&mut self) -> Result<Expr> {
+        // Create a synthetic token for the anonymous function
+        let name = Token::new(
+            TokenType::Identifier(String::from("<anonymous>")),
+            String::from("<anonymous>"),
+            self.previous().get_line(), // use the line of the `fn` keyword
+        );
+
+        self.consume(&TokenType::LeftParen, "Expect '(' after anonymous `fn`.")?;
+        let params = self.parameters()?;
+
+        self.consume(
+            &TokenType::LeftBrace,
+            "Expect '{{' before anonymous `fn` body.",
+        )?;
+        let body = self.block()?;
+
+        Ok(Expr::Lambda(FunctionDeclaration { name, params, body }))
     }
 
     fn assignment(&mut self) -> Result<Expr> {
@@ -471,6 +493,30 @@ impl Parser {
                 line: previous.get_line(),
             }),
         }
+    }
+
+    fn parameters(&mut self) -> Result<Vec<Token>> {
+        // Parse parameters, if any
+        let mut params = Vec::new();
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                if params.len() >= 255 {
+                    return Err(Error::TooManyArguments {
+                        line: self.peek().get_line(),
+                    });
+                }
+
+                params.push(self.consume_identifier("Expect parameter name.")?);
+
+                // If there are no more parameters, break out of the loop
+                if !self.match_token(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        self.consume(&TokenType::RightParen, "Expect ')' after parameters.")?;
+
+        Ok(params)
     }
 
     fn synchronize(&mut self) {

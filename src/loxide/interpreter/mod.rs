@@ -351,6 +351,11 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
                 callable.call(self, arguments)
             }
+
+            Expr::Lambda(lambda) => Ok(Value::Function(Function {
+                declaration: lambda.clone(),
+                closure: self.environment.clone(),
+            })),
         }
     }
 }

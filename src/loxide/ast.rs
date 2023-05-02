@@ -30,6 +30,7 @@ pub enum Expr {
         paren: Token,
         arguments: Vec<Expr>,
     },
+    Lambda(FunctionDeclaration),
 }
 
 #[derive(Clone)]
