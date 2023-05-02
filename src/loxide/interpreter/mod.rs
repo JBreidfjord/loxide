@@ -69,6 +69,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct Interpreter {
     environment: Environment,
+    globals: Environment,
     locals: HashMap<Expr, usize>,
 }
 
@@ -93,7 +94,8 @@ impl Interpreter {
         );
 
         Self {
-            environment: globals,
+            environment: globals.clone(),
+            globals,
             locals: HashMap::new(),
         }
     }
@@ -291,16 +293,27 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
             }
 
             Expr::Variable(name) => {
-                self.environment
-                    .lookup(name.get_lexeme())
-                    .ok_or(Error::UndefinedVariable {
-                        name: name.get_lexeme(),
-                    })
+                let value = if let Some(distance) = self.locals.get(expr) {
+                    self.environment.lookup_at(*distance, name.get_lexeme())
+                } else {
+                    self.globals.lookup(name.get_lexeme())
+                };
+
+                value.ok_or(Error::UndefinedVariable {
+                    name: name.get_lexeme(),
+                })
             }
 
             Expr::Assign { name, value } => {
                 let value = self.visit_expr(value)?;
-                if self.environment.assign(name.get_lexeme(), value.clone()) {
+                let result = if let Some(distance) = self.locals.get(expr) {
+                    self.environment
+                        .assign_at(*distance, name.get_lexeme(), value)
+                } else {
+                    self.globals.assign(name.get_lexeme(), value)
+                };
+
+                if result {
                     Ok(value)
                 } else {
                     Err(Error::UndefinedVariable {
