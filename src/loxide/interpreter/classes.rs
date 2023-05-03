@@ -47,11 +47,15 @@ impl Instance {
     }
 
     pub fn get(&self, name: &Token) -> Option<Value> {
-        // self.fields.borrow().get(&name.get_lexeme()).cloned()
         if let Some(value) = self.fields.borrow().get(&name.get_lexeme()) {
             Some(value.clone())
         } else {
-            self.class.find_method(&name.get_lexeme())
+            self.class
+                .find_method(&name.get_lexeme())
+                .map(|method| match method {
+                    Value::Function(func) => Value::Function(func.bind(self.clone())),
+                    _ => method,
+                })
         }
     }
 

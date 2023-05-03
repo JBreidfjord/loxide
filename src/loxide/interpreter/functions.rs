@@ -2,7 +2,9 @@ use std::fmt;
 
 use crate::loxide::{ast::Stmt, token::Token};
 
-use super::{environment::Environment, value::Value, Error, Interpreter, Result};
+use super::{
+    classes::Instance, environment::Environment, value::Value, Error, Interpreter, Result,
+};
 
 pub trait Callable {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> Result<Value>;
@@ -43,6 +45,17 @@ pub struct FunctionDeclaration {
 pub struct Function {
     pub declaration: FunctionDeclaration,
     pub closure: Environment,
+}
+
+impl Function {
+    pub fn bind(self, instance: Instance) -> Self {
+        let mut environment = self.closure.nest();
+        environment.define("this".to_string(), Value::Instance(instance));
+        Function {
+            declaration: self.declaration,
+            closure: environment,
+        }
+    }
 }
 
 impl Callable for Function {

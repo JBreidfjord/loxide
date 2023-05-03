@@ -18,6 +18,9 @@ pub enum Error {
 
     #[error("Can't return from top-level code.")]
     ReturnOutsideFunction,
+
+    #[error("Internal error: {0}")]
+    Internal(String),
 }
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
@@ -160,6 +163,11 @@ impl Visitor<Result, Result> for Resolver {
                 self.visit_expr(object)?;
                 self.visit_expr(value)
             }
+
+            Expr::This(keyword) => {
+                self.resolve_local(expr, keyword);
+                Ok(())
+            }
         }
     }
 
@@ -224,11 +232,21 @@ impl Visitor<Result, Result> for Resolver {
                 self.declare(name)?;
                 self.define(name);
 
+                // Add a scope for class methods
+                self.begin_scope();
+                // Bind `this` to the class
+                if let Some(scope) = self.scopes.last_mut() {
+                    scope.insert("this".to_string(), true);
+                } else {
+                    return Err(Error::Internal("No scope".to_string()));
+                }
+
                 for method in methods {
                     let fn_type = FnType::Method;
                     self.resolve_function(method, fn_type)?;
                 }
 
+                self.end_scope();
                 Ok(())
             }
         }

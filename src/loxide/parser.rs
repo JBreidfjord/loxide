@@ -504,6 +504,8 @@ impl Parser {
             TokenType::Number(n) => Ok(Expr::Literal(Literal::Number(n))),
             TokenType::String(s) => Ok(Expr::Literal(Literal::String(s))),
 
+            TokenType::This => Ok(Expr::This(previous)),
+
             TokenType::Identifier(_) => Ok(Expr::Variable(previous)),
 
             TokenType::LeftParen => {

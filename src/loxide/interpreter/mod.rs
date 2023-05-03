@@ -127,6 +127,19 @@ impl Interpreter {
 
         result // Return result of block
     }
+
+    fn lookup_variable(&self, name: &Token, expr: &Expr) -> Result<Value> {
+        // Look up the variable in the local or global environment
+        let value = if let Some(distance) = self.locals.get(expr) {
+            self.environment.lookup_at(*distance, name.get_lexeme())
+        } else {
+            self.globals.lookup(name.get_lexeme())
+        };
+
+        value.ok_or(Error::UndefinedVariable {
+            name: name.get_lexeme(),
+        })
+    }
 }
 
 impl Visitor<Result<Value>, Result<()>> for Interpreter {
@@ -317,17 +330,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 }
             }
 
-            Expr::Variable(name) => {
-                let value = if let Some(distance) = self.locals.get(expr) {
-                    self.environment.lookup_at(*distance, name.get_lexeme())
-                } else {
-                    self.globals.lookup(name.get_lexeme())
-                };
-
-                value.ok_or(Error::UndefinedVariable {
-                    name: name.get_lexeme(),
-                })
-            }
+            Expr::Variable(name) | Expr::This(name) => self.lookup_variable(name, expr),
 
             Expr::Assign { name, value } => {
                 let value = self.visit_expr(value)?;

@@ -42,6 +42,7 @@ pub enum Expr {
         name: Token,
         value: Box<Expr>,
     },
+    This(Token),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
