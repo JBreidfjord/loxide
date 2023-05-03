@@ -13,7 +13,16 @@ pub struct Class {
 
 impl Class {
     pub fn find_method(&self, name: &str) -> Option<Value> {
-        self.methods.get(name).cloned()
+        if let Some(value) = self.methods.get(name) {
+            Some(value.clone())
+        } else if let Some(superclass) = self.superclass.clone() {
+            match *superclass {
+                Value::Class(class) => class.find_method(name),
+                _ => unreachable!("Expected class for superclass"),
+            }
+        } else {
+            None
+        }
     }
 }
 
