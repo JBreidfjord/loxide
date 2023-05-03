@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt};
+use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 use crate::loxide::token::Token;
 
@@ -28,23 +28,23 @@ impl fmt::Debug for Class {
 #[derive(Clone)]
 pub struct Instance {
     class: Class,
-    fields: HashMap<String, Value>,
+    fields: Rc<RefCell<HashMap<String, Value>>>,
 }
 
 impl Instance {
     pub fn new(class: Class) -> Self {
         Self {
             class,
-            fields: HashMap::new(),
+            fields: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
     pub fn get(&self, name: &Token) -> Option<Value> {
-        self.fields.get(&name.get_lexeme()).cloned()
+        self.fields.borrow().get(&name.get_lexeme()).cloned()
     }
 
     pub fn set(&mut self, name: &Token, value: Value) {
-        self.fields.insert(name.get_lexeme(), value);
+        self.fields.borrow_mut().insert(name.get_lexeme(), value);
     }
 }
 

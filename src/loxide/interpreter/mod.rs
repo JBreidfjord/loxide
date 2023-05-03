@@ -410,9 +410,9 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 name,
                 value,
             } => {
-                let mut object = self.visit_expr(object)?;
+                let object = self.visit_expr(object)?;
 
-                if let Value::Instance(ref mut instance) = object {
+                if let Value::Instance(mut instance) = object {
                     let value = self.visit_expr(value)?;
                     instance.set(name, value.clone());
                     Ok(value)
