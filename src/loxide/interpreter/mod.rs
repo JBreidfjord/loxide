@@ -187,10 +187,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
             Stmt::Break => return Err(Error::Break),
 
             Stmt::Function(declaration) => {
-                let function = Function {
-                    declaration: declaration.clone(),
-                    closure: self.environment.clone(),
-                };
+                let function = Function::new(declaration.clone(), self.environment.clone());
                 self.environment
                     .define(declaration.name.get_lexeme(), Value::Function(function));
             }
@@ -208,9 +205,10 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
                 let mut class_methods = HashMap::new();
                 for method in methods {
-                    let function = Function {
-                        declaration: method.clone(),
-                        closure: self.environment.clone(),
+                    let function = if method.name.get_lexeme() == "init" {
+                        Function::new(method.clone(), self.environment.clone())
+                    } else {
+                        Function::new_init(method.clone(), self.environment.clone())
                     };
                     class_methods.insert(method.name.get_lexeme(), Value::Function(function));
                 }
@@ -398,10 +396,10 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 callable.call(self, arguments)
             }
 
-            Expr::Lambda(lambda) => Ok(Value::Function(Function {
-                declaration: lambda.clone(),
-                closure: self.environment.clone(),
-            })),
+            Expr::Lambda(lambda) => Ok(Value::Function(Function::new(
+                lambda.clone(),
+                self.environment.clone(),
+            ))),
 
             Expr::Get { object, name } => {
                 let object = self.visit_expr(object)?;

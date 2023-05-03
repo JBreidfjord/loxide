@@ -21,9 +21,6 @@ pub enum Error {
 
     #[error("Can't use `this` outside of a class.")]
     ThisOutsideClass,
-
-    #[error("Internal error: {0}")]
-    Internal(String),
 }
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
@@ -255,7 +252,7 @@ impl Visitor<Result, Result> for Resolver {
                 if let Some(scope) = self.scopes.last_mut() {
                     scope.insert("this".to_string(), true);
                 } else {
-                    return Err(Error::Internal("No scope".to_string()));
+                    unreachable!("No scope for class methods");
                 }
 
                 for method in methods {

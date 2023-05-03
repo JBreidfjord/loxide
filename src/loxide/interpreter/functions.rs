@@ -45,15 +45,32 @@ pub struct FunctionDeclaration {
 pub struct Function {
     pub declaration: FunctionDeclaration,
     pub closure: Environment,
+    pub is_init: bool,
 }
 
 impl Function {
+    pub fn new(declaration: FunctionDeclaration, closure: Environment) -> Self {
+        Self {
+            declaration,
+            closure,
+            is_init: false,
+        }
+    }
+
+    pub fn new_init(declaration: FunctionDeclaration, closure: Environment) -> Self {
+        Self {
+            declaration,
+            closure,
+            is_init: true,
+        }
+    }
+
     pub fn bind(self, instance: Instance) -> Self {
         let mut environment = self.closure.nest();
         environment.define("this".to_string(), Value::Instance(instance));
-        Function {
-            declaration: self.declaration,
+        Self {
             closure: environment,
+            ..self
         }
     }
 }
@@ -72,7 +89,16 @@ impl Callable for Function {
 
         match interpreter.execute_block(&self.declaration.body, environment) {
             Err(Error::Return(value)) => Ok(value),
-            Ok(_) => Ok(Value::Nil),
+            Ok(_) => {
+                Ok(if self.is_init {
+                    // If the function is an initializer, return the instance that was created
+                    self.closure
+                        .lookup_at(0, "this".to_string())
+                        .expect("Expected `this` to be defined in initializer")
+                } else {
+                    Value::Nil
+                })
+            }
             Err(e) => Err(e),
         }
     }

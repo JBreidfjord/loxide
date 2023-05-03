@@ -18,11 +18,28 @@ impl Class {
 
 impl Callable for Class {
     fn arity(&self) -> usize {
-        0
+        // If the class has an init method, return its arity
+        if let Some(init) = self.find_method("init") {
+            match init {
+                Value::Function(func) => func.arity(),
+                _ => unreachable!("Expected function for init method"),
+            }
+        } else {
+            0
+        }
     }
 
-    fn call(&self, _: &mut Interpreter, _: Vec<Value>) -> Result<Value> {
-        Ok(Value::Instance(Instance::new(self.clone())))
+    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> Result<Value> {
+        let instance = Instance::new(self.clone());
+        // Bind and call the init method if it exists
+        if let Some(init) = self.find_method("init") {
+            match init {
+                Value::Function(func) => func.bind(instance.clone()).call(interpreter, arguments),
+                _ => unreachable!("Expected function for init method"),
+            }?;
+        }
+
+        Ok(Value::Instance(instance))
     }
 }
 
