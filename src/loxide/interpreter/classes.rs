@@ -7,6 +7,13 @@ use super::{functions::Callable, value::Value, Interpreter, Result};
 #[derive(Clone)]
 pub struct Class {
     pub name: String,
+    pub methods: HashMap<String, Value>,
+}
+
+impl Class {
+    pub fn find_method(&self, name: &str) -> Option<Value> {
+        self.methods.get(name).cloned()
+    }
 }
 
 impl Callable for Class {
@@ -40,7 +47,12 @@ impl Instance {
     }
 
     pub fn get(&self, name: &Token) -> Option<Value> {
-        self.fields.borrow().get(&name.get_lexeme()).cloned()
+        // self.fields.borrow().get(&name.get_lexeme()).cloned()
+        if let Some(value) = self.fields.borrow().get(&name.get_lexeme()) {
+            Some(value.clone())
+        } else {
+            self.class.find_method(&name.get_lexeme())
+        }
     }
 
     pub fn set(&mut self, name: &Token, value: Value) {

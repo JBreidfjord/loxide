@@ -190,10 +190,21 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 return Err(Error::Return(value));
             }
 
-            Stmt::Class { name, .. } => {
+            Stmt::Class { name, methods } => {
                 self.environment.define(name.get_lexeme(), Value::Nil);
+
+                let mut class_methods = HashMap::new();
+                for method in methods {
+                    let function = Function {
+                        declaration: method.clone(),
+                        closure: self.environment.clone(),
+                    };
+                    class_methods.insert(method.name.get_lexeme(), Value::Function(function));
+                }
+
                 let class = Class {
                     name: name.get_lexeme(),
+                    methods: class_methods,
                 };
                 self.environment
                     .assign(name.get_lexeme(), Value::Class(class));

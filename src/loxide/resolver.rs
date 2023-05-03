@@ -26,6 +26,7 @@ type Result<T = (), E = Error> = std::result::Result<T, E>;
 enum FnType {
     None,
     Function,
+    Method,
 }
 
 pub struct Resolver {
@@ -219,9 +220,15 @@ impl Visitor<Result, Result> for Resolver {
 
             Stmt::Break => Ok(()),
 
-            Stmt::Class { name, .. } => {
+            Stmt::Class { name, methods } => {
                 self.declare(name)?;
                 self.define(name);
+
+                for method in methods {
+                    let fn_type = FnType::Method;
+                    self.resolve_function(method, fn_type)?;
+                }
+
                 Ok(())
             }
         }
