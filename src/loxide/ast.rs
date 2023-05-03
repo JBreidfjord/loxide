@@ -33,6 +33,10 @@ pub enum Expr {
         arguments: Vec<Expr>,
     },
     Lambda(FunctionDeclaration),
+    Get {
+        object: Box<Expr>,
+        name: Token,
+    },
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]

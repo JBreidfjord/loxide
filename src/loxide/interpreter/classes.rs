@@ -1,4 +1,6 @@
-use std::fmt;
+use std::{collections::HashMap, fmt};
+
+use crate::loxide::token::Token;
 
 use super::{functions::Callable, value::Value, Interpreter, Result};
 
@@ -13,9 +15,7 @@ impl Callable for Class {
     }
 
     fn call(&self, _: &mut Interpreter, _: Vec<Value>) -> Result<Value> {
-        Ok(Value::Instance(Instance {
-            class: self.clone(),
-        }))
+        Ok(Value::Instance(Instance::new(self.clone())))
     }
 }
 
@@ -27,7 +27,21 @@ impl fmt::Debug for Class {
 
 #[derive(Clone)]
 pub struct Instance {
-    pub class: Class,
+    class: Class,
+    fields: HashMap<String, Value>,
+}
+
+impl Instance {
+    pub fn new(class: Class) -> Self {
+        Self {
+            class,
+            fields: HashMap::new(),
+        }
+    }
+
+    pub fn get(&self, name: &Token) -> Option<Value> {
+        self.fields.get(&name.get_lexeme()).cloned()
+    }
 }
 
 impl fmt::Debug for Instance {

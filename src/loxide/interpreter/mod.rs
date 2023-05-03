@@ -55,7 +55,7 @@ pub enum Error {
     #[error("Break statement outside of loop.")]
     Break,
 
-    #[error("Cannot call non-callable value of type {}.", .value.type_of())]
+    #[error("Cannot call non-callable value of type `{}`.", .value.type_of())]
     NotCallable { value: Value },
 
     #[error("Expected {expected} arguments but found {found}.")]
@@ -66,6 +66,12 @@ pub enum Error {
 
     #[error("Return statement outside of function.")]
     Return(Value),
+
+    #[error("Tried to access property `{property}` on non-object `{value}` of type `{}`.", .value.type_of())]
+    PropertyOnNonObject { property: String, value: Value },
+
+    #[error("Undefined property `{property}` on object `{value}`.")]
+    UndefinedProperty { property: String, value: Value },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -382,6 +388,22 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 declaration: lambda.clone(),
                 closure: self.environment.clone(),
             })),
+
+            Expr::Get { object, name } => {
+                let object = self.visit_expr(object)?;
+                match object {
+                    Value::Instance(ref instance) => {
+                        instance.get(name).ok_or(Error::UndefinedProperty {
+                            property: name.get_lexeme(),
+                            value: object,
+                        })
+                    }
+                    _ => Err(Error::PropertyOnNonObject {
+                        property: name.get_lexeme(),
+                        value: object,
+                    }),
+                }
+            }
         }
     }
 }

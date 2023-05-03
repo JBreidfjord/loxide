@@ -152,6 +152,8 @@ impl Visitor<Result, Result> for Resolver {
             Expr::Unary { right, .. } => self.visit_expr(right),
 
             Expr::Lambda(declaration) => self.resolve_function(declaration, FnType::Function),
+
+            Expr::Get { object, .. } => self.visit_expr(object),
         }
     }
 
