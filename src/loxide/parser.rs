@@ -49,6 +49,7 @@ impl Parser {
     fn declaration(&mut self) -> Result<Stmt> {
         let previous = self.advance(); // consume and return the current token
         let result = match previous.get_token_type() {
+            TokenType::Class => self.class_declaration(),
             TokenType::Fn => self.function_statement(),
             TokenType::Var => self.var_declaration(),
             _ => {
@@ -64,10 +65,23 @@ impl Parser {
         result
     }
 
+    fn class_declaration(&mut self) -> Result<Stmt> {
+        let name = self.consume_identifier("Expect class name.")?;
+        self.consume(&TokenType::LeftBrace, "Expect '{' before class body.")?;
+
+        let mut methods = Vec::new();
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            methods.push(self.function("method")?);
+        }
+
+        self.consume(&TokenType::RightBrace, "Expect '}' after class body.")?;
+        Ok(Stmt::Class { name, methods })
+    }
+
     fn function_statement(&mut self) -> Result<Stmt> {
         if let TokenType::Identifier(_) = self.peek().get_token_type() {
             // If the next token is an identifier, it's a named function declaration
-            self.function("function")
+            self.function("function").map(Stmt::Function)
         } else {
             // Otherwise, it's an anonymous function declaration
             let lambda = self.lambda()?;
@@ -79,7 +93,7 @@ impl Parser {
         }
     }
 
-    fn function(&mut self, kind: &str) -> Result<Stmt> {
+    fn function(&mut self, kind: &str) -> Result<FunctionDeclaration> {
         let name = self.consume_identifier(&format!("Expect {} name.", kind))?;
         self.consume(
             &TokenType::LeftParen,
@@ -94,7 +108,7 @@ impl Parser {
         )?;
         let body = self.block()?;
 
-        Ok(Stmt::Function(FunctionDeclaration { name, params, body }))
+        Ok(FunctionDeclaration { name, params, body })
     }
 
     fn var_declaration(&mut self) -> Result<Stmt> {
@@ -302,6 +316,11 @@ impl Parser {
                     name,
                     value: Box::new(value),
                 }),
+                Expr::Get { object, name } => Ok(Expr::Set {
+                    object,
+                    name,
+                    value: Box::new(value),
+                }),
                 _ => Err(Error::Syntax {
                     msg: "Invalid assignment target.".to_string(),
                     line: equals.get_line(),
@@ -432,6 +451,12 @@ impl Parser {
         loop {
             if self.match_token(&[TokenType::LeftParen]) {
                 expr = self.finish_call(expr)?;
+            } else if self.match_token(&[TokenType::Dot]) {
+                let name = self.consume_identifier("Expect property name after '.'.")?;
+                expr = Expr::Get {
+                    object: Box::new(expr),
+                    name,
+                }
             } else {
                 break;
             }
@@ -478,6 +503,8 @@ impl Parser {
             TokenType::Nil => Ok(Expr::Literal(Literal::Nil)),
             TokenType::Number(n) => Ok(Expr::Literal(Literal::Number(n))),
             TokenType::String(s) => Ok(Expr::Literal(Literal::String(s))),
+
+            TokenType::This => Ok(Expr::This(previous)),
 
             TokenType::Identifier(_) => Ok(Expr::Variable(previous)),
 

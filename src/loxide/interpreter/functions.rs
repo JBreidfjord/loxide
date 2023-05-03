@@ -2,7 +2,9 @@ use std::fmt;
 
 use crate::loxide::{ast::Stmt, token::Token};
 
-use super::{environment::Environment, value::Value, Error, Interpreter, Result};
+use super::{
+    classes::Instance, environment::Environment, value::Value, Error, Interpreter, Result,
+};
 
 pub trait Callable {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> Result<Value>;
@@ -43,6 +45,34 @@ pub struct FunctionDeclaration {
 pub struct Function {
     pub declaration: FunctionDeclaration,
     pub closure: Environment,
+    pub is_init: bool,
+}
+
+impl Function {
+    pub fn new(declaration: FunctionDeclaration, closure: Environment) -> Self {
+        Self {
+            declaration,
+            closure,
+            is_init: false,
+        }
+    }
+
+    pub fn new_init(declaration: FunctionDeclaration, closure: Environment) -> Self {
+        Self {
+            declaration,
+            closure,
+            is_init: true,
+        }
+    }
+
+    pub fn bind(self, instance: Instance) -> Self {
+        let mut environment = self.closure.nest();
+        environment.define("this".to_string(), Value::Instance(instance));
+        Self {
+            closure: environment,
+            ..self
+        }
+    }
 }
 
 impl Callable for Function {
@@ -57,10 +87,20 @@ impl Callable for Function {
             environment.define(param.get_lexeme(), arg);
         }
 
-        match interpreter.execute_block(&self.declaration.body, environment) {
-            Err(Error::Return(value)) => Ok(value),
-            Ok(_) => Ok(Value::Nil),
-            Err(e) => Err(e),
+        let result = interpreter.execute_block(&self.declaration.body, environment);
+        if self.is_init {
+            // If this is an initializer, always return `this`
+            Ok(self
+                .closure
+                .lookup_at(0, "this".to_string())
+                .expect("Expected `this` to be defined in initializer"))
+        } else {
+            // Otherwise, return the result of the block
+            match result {
+                Err(Error::Return(value)) => Ok(value),
+                Ok(_) => Ok(Value::Nil),
+                Err(e) => Err(e),
+            }
         }
     }
 }

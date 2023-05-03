@@ -33,6 +33,16 @@ pub enum Expr {
         arguments: Vec<Expr>,
     },
     Lambda(FunctionDeclaration),
+    Get {
+        object: Box<Expr>,
+        name: Token,
+    },
+    Set {
+        object: Box<Expr>,
+        name: Token,
+        value: Box<Expr>,
+    },
+    This(Token),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -58,6 +68,10 @@ pub enum Stmt {
     Return {
         keyword: Token,
         value: Option<Expr>,
+    },
+    Class {
+        name: Token,
+        methods: Vec<FunctionDeclaration>,
     },
 }
 

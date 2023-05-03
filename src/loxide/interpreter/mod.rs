@@ -4,6 +4,7 @@ use ordered_float::OrderedFloat;
 use thiserror::Error;
 
 use self::{
+    classes::Class,
     environment::Environment,
     functions::{Callable, Function, NativeFunction},
     value::Value,
@@ -15,6 +16,7 @@ use super::{
     token_type::TokenType,
 };
 
+mod classes;
 mod environment;
 pub mod functions;
 mod value;
@@ -53,7 +55,7 @@ pub enum Error {
     #[error("Break statement outside of loop.")]
     Break,
 
-    #[error("Cannot call non-callable value of type {}.", .value.type_of())]
+    #[error("Cannot call non-callable value of type `{}`.", .value.type_of())]
     NotCallable { value: Value },
 
     #[error("Expected {expected} arguments but found {found}.")]
@@ -64,6 +66,12 @@ pub enum Error {
 
     #[error("Return statement outside of function.")]
     Return(Value),
+
+    #[error("Tried to access property `{property}` on non-object `{value}` of type `{}`.", .value.type_of())]
+    PropertyOnNonObject { property: String, value: Value },
+
+    #[error("Undefined property `{property}` on object `{value}`.")]
+    UndefinedProperty { property: String, value: Value },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -119,6 +127,19 @@ impl Interpreter {
 
         result // Return result of block
     }
+
+    fn lookup_variable(&self, name: &Token, expr: &Expr) -> Result<Value> {
+        // Look up the variable in the local or global environment
+        let value = if let Some(distance) = self.locals.get(expr) {
+            self.environment.lookup_at(*distance, name.get_lexeme())
+        } else {
+            self.globals.lookup(name.get_lexeme())
+        };
+
+        value.ok_or(Error::UndefinedVariable {
+            name: name.get_lexeme(),
+        })
+    }
 }
 
 impl Visitor<Result<Value>, Result<()>> for Interpreter {
@@ -166,10 +187,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
             Stmt::Break => return Err(Error::Break),
 
             Stmt::Function(declaration) => {
-                let function = Function {
-                    declaration: declaration.clone(),
-                    closure: self.environment.clone(),
-                };
+                let function = Function::new(declaration.clone(), self.environment.clone());
                 self.environment
                     .define(declaration.name.get_lexeme(), Value::Function(function));
             }
@@ -180,6 +198,27 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     None => Value::Nil,
                 };
                 return Err(Error::Return(value));
+            }
+
+            Stmt::Class { name, methods } => {
+                self.environment.define(name.get_lexeme(), Value::Nil);
+
+                let mut class_methods = HashMap::new();
+                for method in methods {
+                    let function = if method.name.get_lexeme() == "init" {
+                        Function::new_init(method.clone(), self.environment.clone())
+                    } else {
+                        Function::new(method.clone(), self.environment.clone())
+                    };
+                    class_methods.insert(method.name.get_lexeme(), Value::Function(function));
+                }
+
+                let class = Class {
+                    name: name.get_lexeme(),
+                    methods: class_methods,
+                };
+                self.environment
+                    .assign(name.get_lexeme(), Value::Class(class));
             }
         }
 
@@ -289,17 +328,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 }
             }
 
-            Expr::Variable(name) => {
-                let value = if let Some(distance) = self.locals.get(expr) {
-                    self.environment.lookup_at(*distance, name.get_lexeme())
-                } else {
-                    self.globals.lookup(name.get_lexeme())
-                };
-
-                value.ok_or(Error::UndefinedVariable {
-                    name: name.get_lexeme(),
-                })
-            }
+            Expr::Variable(name) | Expr::This(name) => self.lookup_variable(name, expr),
 
             Expr::Assign { name, value } => {
                 let value = self.visit_expr(value)?;
@@ -348,6 +377,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 let callable: Box<dyn Callable> = match callee {
                     Value::NativeFunction(function) => Box::new(function),
                     Value::Function(function) => Box::new(function),
+                    Value::Class(class) => Box::new(class),
                     _ => return Err(Error::NotCallable { value: callee }),
                 };
 
@@ -366,10 +396,45 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 callable.call(self, arguments)
             }
 
-            Expr::Lambda(lambda) => Ok(Value::Function(Function {
-                declaration: lambda.clone(),
-                closure: self.environment.clone(),
-            })),
+            Expr::Lambda(lambda) => Ok(Value::Function(Function::new(
+                lambda.clone(),
+                self.environment.clone(),
+            ))),
+
+            Expr::Get { object, name } => {
+                let object = self.visit_expr(object)?;
+
+                if let Value::Instance(ref instance) = object {
+                    instance.get(name).ok_or(Error::UndefinedProperty {
+                        property: name.get_lexeme(),
+                        value: object,
+                    })
+                } else {
+                    Err(Error::PropertyOnNonObject {
+                        property: name.get_lexeme(),
+                        value: object,
+                    })
+                }
+            }
+
+            Expr::Set {
+                object,
+                name,
+                value,
+            } => {
+                let object = self.visit_expr(object)?;
+
+                if let Value::Instance(mut instance) = object {
+                    let value = self.visit_expr(value)?;
+                    instance.set(name, value.clone());
+                    Ok(value)
+                } else {
+                    Err(Error::PropertyOnNonObject {
+                        property: name.get_lexeme(),
+                        value: object,
+                    })
+                }
+            }
         }
     }
 }

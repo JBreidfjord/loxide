@@ -18,6 +18,12 @@ pub enum Error {
 
     #[error("Can't return from top-level code.")]
     ReturnOutsideFunction,
+
+    #[error("Can't return a value from an initializer.")]
+    ReturnFromInitializer,
+
+    #[error("Can't use `this` outside of a class.")]
+    ThisOutsideClass,
 }
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
@@ -26,12 +32,21 @@ type Result<T = (), E = Error> = std::result::Result<T, E>;
 enum FnType {
     None,
     Function,
+    Method,
+    Initializer,
+}
+
+#[derive(PartialEq, Copy, Clone)]
+enum ClassType {
+    None,
+    Class,
 }
 
 pub struct Resolver {
     scopes: Vec<HashMap<String, bool>>,
     locals: HashMap<Expr, usize>,
     current_fn: FnType,
+    current_class: ClassType,
 }
 
 impl Resolver {
@@ -40,6 +55,7 @@ impl Resolver {
             scopes: Vec::new(),
             locals: HashMap::new(),
             current_fn: FnType::None,
+            current_class: ClassType::None,
         }
     }
 
@@ -152,6 +168,21 @@ impl Visitor<Result, Result> for Resolver {
             Expr::Unary { right, .. } => self.visit_expr(right),
 
             Expr::Lambda(declaration) => self.resolve_function(declaration, FnType::Function),
+
+            Expr::Get { object, .. } => self.visit_expr(object),
+
+            Expr::Set { object, value, .. } => {
+                self.visit_expr(object)?;
+                self.visit_expr(value)
+            }
+
+            Expr::This(keyword) => {
+                if self.current_class == ClassType::None {
+                    return Err(Error::ThisOutsideClass);
+                }
+                self.resolve_local(expr, keyword);
+                Ok(())
+            }
         }
     }
 
@@ -200,6 +231,10 @@ impl Visitor<Result, Result> for Resolver {
                 }
 
                 if let Some(value) = value {
+                    if self.current_fn == FnType::Initializer {
+                        return Err(Error::ReturnFromInitializer);
+                    }
+
                     self.visit_expr(value)?;
                 }
                 Ok(())
@@ -211,6 +246,36 @@ impl Visitor<Result, Result> for Resolver {
             }
 
             Stmt::Break => Ok(()),
+
+            Stmt::Class { name, methods } => {
+                let enclosing_class = self.current_class;
+                self.current_class = ClassType::Class;
+
+                self.declare(name)?;
+                self.define(name);
+
+                // Add a scope for class methods
+                self.begin_scope();
+                // Bind `this` to the class
+                if let Some(scope) = self.scopes.last_mut() {
+                    scope.insert("this".to_string(), true);
+                } else {
+                    unreachable!("No scope for class methods");
+                }
+
+                for method in methods {
+                    let fn_type = if method.name.get_lexeme() == "init" {
+                        FnType::Initializer
+                    } else {
+                        FnType::Method
+                    };
+                    self.resolve_function(method, fn_type)?;
+                }
+
+                self.end_scope();
+                self.current_class = enclosing_class;
+                Ok(())
+            }
         }
     }
 }

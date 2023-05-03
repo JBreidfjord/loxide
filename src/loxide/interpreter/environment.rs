@@ -48,15 +48,17 @@ impl Environment {
 
     pub fn lookup(&self, name: String) -> Option<Value> {
         if let Some(scope) = self.0.as_ref() {
-            if let Some(value) = scope.variables.borrow().get(&name).cloned() {
-                return Some(value);
-            }
-
             // If the variable is not found in the current environment,
             // we recursively search the enclosing environment.
-            return self.enclosing().lookup(name);
+            scope
+                .variables
+                .borrow()
+                .get(&name)
+                .cloned()
+                .or_else(|| self.enclosing().lookup(name))
+        } else {
+            None
         }
-        None
     }
 
     pub fn lookup_at(&self, distance: usize, name: String) -> Option<Value> {
