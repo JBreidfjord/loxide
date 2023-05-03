@@ -7,6 +7,7 @@ use super::{functions::Callable, value::Value, Interpreter, Result};
 #[derive(Clone)]
 pub struct Class {
     pub name: String,
+    pub superclass: Option<Box<Value>>,
     pub methods: HashMap<String, Value>,
 }
 

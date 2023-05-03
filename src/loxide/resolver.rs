@@ -24,6 +24,9 @@ pub enum Error {
 
     #[error("Can't use `this` outside of a class.")]
     ThisOutsideClass,
+
+    #[error("Class {name} can't inherit from itself.")]
+    ClassInheritanceCycle { name: String },
 }
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
@@ -247,12 +250,31 @@ impl Visitor<Result, Result> for Resolver {
 
             Stmt::Break => Ok(()),
 
-            Stmt::Class { name, methods } => {
+            Stmt::Class {
+                name,
+                superclass,
+                methods,
+            } => {
                 let enclosing_class = self.current_class;
                 self.current_class = ClassType::Class;
 
                 self.declare(name)?;
                 self.define(name);
+
+                if let Some(superclass) = superclass {
+                    match superclass {
+                        Expr::Variable(token) => {
+                            if name.get_lexeme() == token.get_lexeme() {
+                                return Err(Error::ClassInheritanceCycle {
+                                    name: name.get_lexeme(),
+                                });
+                            }
+                        }
+                        _ => unreachable!("Superclass should be a variable expression"),
+                    }
+
+                    self.visit_expr(superclass)?;
+                }
 
                 // Add a scope for class methods
                 self.begin_scope();

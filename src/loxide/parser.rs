@@ -67,6 +67,15 @@ impl Parser {
 
     fn class_declaration(&mut self) -> Result<Stmt> {
         let name = self.consume_identifier("Expect class name.")?;
+
+        let superclass = match self.consume(&TokenType::Less, "") {
+            Ok(_) => {
+                self.consume_identifier("Expect superclass name.")?;
+                Some(Expr::Variable(self.previous()))
+            }
+            Err(_) => None,
+        };
+
         self.consume(&TokenType::LeftBrace, "Expect '{' before class body.")?;
 
         let mut methods = Vec::new();
@@ -75,7 +84,11 @@ impl Parser {
         }
 
         self.consume(&TokenType::RightBrace, "Expect '}' after class body.")?;
-        Ok(Stmt::Class { name, methods })
+        Ok(Stmt::Class {
+            name,
+            superclass,
+            methods,
+        })
     }
 
     fn function_statement(&mut self) -> Result<Stmt> {

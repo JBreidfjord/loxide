@@ -72,6 +72,9 @@ pub enum Error {
 
     #[error("Undefined property `{property}` on object `{value}`.")]
     UndefinedProperty { property: String, value: Value },
+
+    #[error("Superclass {value} must be a class.")]
+    SuperclassNotAClass { value: Value },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -200,7 +203,21 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 return Err(Error::Return(value));
             }
 
-            Stmt::Class { name, methods } => {
+            Stmt::Class {
+                name,
+                superclass,
+                methods,
+            } => {
+                let superclass = if let Some(superclass) = superclass {
+                    let superclass = self.visit_expr(superclass)?;
+                    match superclass {
+                        Value::Class(class) => Ok(Some(Box::new(Value::Class(class)))),
+                        _ => Err(Error::SuperclassNotAClass { value: superclass }),
+                    }
+                } else {
+                    Ok(None)
+                }?;
+
                 self.environment.define(name.get_lexeme(), Value::Nil);
 
                 let mut class_methods = HashMap::new();
@@ -215,6 +232,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
                 let class = Class {
                     name: name.get_lexeme(),
+                    superclass,
                     methods: class_methods,
                 };
                 self.environment
