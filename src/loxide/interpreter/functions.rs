@@ -87,19 +87,20 @@ impl Callable for Function {
             environment.define(param.get_lexeme(), arg);
         }
 
-        match interpreter.execute_block(&self.declaration.body, environment) {
-            Err(Error::Return(value)) => Ok(value),
-            Ok(_) => {
-                Ok(if self.is_init {
-                    // If the function is an initializer, return the instance that was created
-                    self.closure
-                        .lookup_at(0, "this".to_string())
-                        .expect("Expected `this` to be defined in initializer")
-                } else {
-                    Value::Nil
-                })
+        let result = interpreter.execute_block(&self.declaration.body, environment);
+        if self.is_init {
+            // If this is an initializer, always return `this`
+            Ok(self
+                .closure
+                .lookup_at(0, "this".to_string())
+                .expect("Expected `this` to be defined in initializer"))
+        } else {
+            // Otherwise, return the result of the block
+            match result {
+                Err(Error::Return(value)) => Ok(value),
+                Ok(_) => Ok(Value::Nil),
+                Err(e) => Err(e),
             }
-            Err(e) => Err(e),
         }
     }
 }

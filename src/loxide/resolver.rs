@@ -19,6 +19,9 @@ pub enum Error {
     #[error("Can't return from top-level code.")]
     ReturnOutsideFunction,
 
+    #[error("Can't return a value from an initializer.")]
+    ReturnFromInitializer,
+
     #[error("Can't use `this` outside of a class.")]
     ThisOutsideClass,
 }
@@ -30,6 +33,7 @@ enum FnType {
     None,
     Function,
     Method,
+    Initializer,
 }
 
 #[derive(PartialEq, Copy, Clone)]
@@ -227,6 +231,10 @@ impl Visitor<Result, Result> for Resolver {
                 }
 
                 if let Some(value) = value {
+                    if self.current_fn == FnType::Initializer {
+                        return Err(Error::ReturnFromInitializer);
+                    }
+
                     self.visit_expr(value)?;
                 }
                 Ok(())
@@ -256,7 +264,11 @@ impl Visitor<Result, Result> for Resolver {
                 }
 
                 for method in methods {
-                    let fn_type = FnType::Method;
+                    let fn_type = if method.name.get_lexeme() == "init" {
+                        FnType::Initializer
+                    } else {
+                        FnType::Method
+                    };
                     self.resolve_function(method, fn_type)?;
                 }
 
