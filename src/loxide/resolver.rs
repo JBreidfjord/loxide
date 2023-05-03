@@ -19,6 +19,9 @@ pub enum Error {
     #[error("Can't return from top-level code.")]
     ReturnOutsideFunction,
 
+    #[error("Can't use `this` outside of a class.")]
+    ThisOutsideClass,
+
     #[error("Internal error: {0}")]
     Internal(String),
 }
@@ -32,10 +35,17 @@ enum FnType {
     Method,
 }
 
+#[derive(PartialEq, Copy, Clone)]
+enum ClassType {
+    None,
+    Class,
+}
+
 pub struct Resolver {
     scopes: Vec<HashMap<String, bool>>,
     locals: HashMap<Expr, usize>,
     current_fn: FnType,
+    current_class: ClassType,
 }
 
 impl Resolver {
@@ -44,6 +54,7 @@ impl Resolver {
             scopes: Vec::new(),
             locals: HashMap::new(),
             current_fn: FnType::None,
+            current_class: ClassType::None,
         }
     }
 
@@ -165,6 +176,9 @@ impl Visitor<Result, Result> for Resolver {
             }
 
             Expr::This(keyword) => {
+                if self.current_class == ClassType::None {
+                    return Err(Error::ThisOutsideClass);
+                }
                 self.resolve_local(expr, keyword);
                 Ok(())
             }
@@ -229,6 +243,9 @@ impl Visitor<Result, Result> for Resolver {
             Stmt::Break => Ok(()),
 
             Stmt::Class { name, methods } => {
+                let enclosing_class = self.current_class;
+                self.current_class = ClassType::Class;
+
                 self.declare(name)?;
                 self.define(name);
 
@@ -247,6 +264,7 @@ impl Visitor<Result, Result> for Resolver {
                 }
 
                 self.end_scope();
+                self.current_class = enclosing_class;
                 Ok(())
             }
         }
