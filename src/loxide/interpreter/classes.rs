@@ -42,6 +42,10 @@ impl Instance {
     pub fn get(&self, name: &Token) -> Option<Value> {
         self.fields.get(&name.get_lexeme()).cloned()
     }
+
+    pub fn set(&mut self, name: &Token, value: Value) {
+        self.fields.insert(name.get_lexeme(), value);
+    }
 }
 
 impl fmt::Debug for Instance {

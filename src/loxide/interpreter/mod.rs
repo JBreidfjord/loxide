@@ -391,17 +391,36 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
             Expr::Get { object, name } => {
                 let object = self.visit_expr(object)?;
-                match object {
-                    Value::Instance(ref instance) => {
-                        instance.get(name).ok_or(Error::UndefinedProperty {
-                            property: name.get_lexeme(),
-                            value: object,
-                        })
-                    }
-                    _ => Err(Error::PropertyOnNonObject {
+
+                if let Value::Instance(ref instance) = object {
+                    instance.get(name).ok_or(Error::UndefinedProperty {
                         property: name.get_lexeme(),
                         value: object,
-                    }),
+                    })
+                } else {
+                    Err(Error::PropertyOnNonObject {
+                        property: name.get_lexeme(),
+                        value: object,
+                    })
+                }
+            }
+
+            Expr::Set {
+                object,
+                name,
+                value,
+            } => {
+                let mut object = self.visit_expr(object)?;
+
+                if let Value::Instance(ref mut instance) = object {
+                    let value = self.visit_expr(value)?;
+                    instance.set(name, value.clone());
+                    Ok(value)
+                } else {
+                    Err(Error::PropertyOnNonObject {
+                        property: name.get_lexeme(),
+                        value: object,
+                    })
                 }
             }
         }

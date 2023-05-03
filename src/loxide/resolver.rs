@@ -154,6 +154,11 @@ impl Visitor<Result, Result> for Resolver {
             Expr::Lambda(declaration) => self.resolve_function(declaration, FnType::Function),
 
             Expr::Get { object, .. } => self.visit_expr(object),
+
+            Expr::Set { object, value, .. } => {
+                self.visit_expr(object)?;
+                self.visit_expr(value)
+            }
         }
     }
 

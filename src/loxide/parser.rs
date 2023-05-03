@@ -316,6 +316,11 @@ impl Parser {
                     name,
                     value: Box::new(value),
                 }),
+                Expr::Get { object, name } => Ok(Expr::Set {
+                    object,
+                    name,
+                    value: Box::new(value),
+                }),
                 _ => Err(Error::Syntax {
                     msg: "Invalid assignment target.".to_string(),
                     line: equals.get_line(),
