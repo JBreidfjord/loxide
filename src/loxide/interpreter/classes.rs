@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 use crate::loxide::token::Token;
 
-use super::{functions::Callable, value::Value, Interpreter, Result};
+use super::{functions::Callable, value::Value, Error, Interpreter, Result};
 
 #[derive(Clone)]
 pub struct Class {
@@ -53,6 +53,20 @@ impl Callable for Class {
     }
 }
 
+impl TryFrom<Value> for Class {
+    type Error = Error;
+
+    fn try_from(value: Value) -> Result<Class, Error> {
+        match value {
+            Value::Class(class) => Ok(class),
+            _ => Err(Error::ConversionError {
+                from: value,
+                to: "<class>".to_string(),
+            }),
+        }
+    }
+}
+
 impl fmt::Debug for Class {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<class {}>", self.name)
@@ -88,6 +102,20 @@ impl Instance {
 
     pub fn set(&mut self, name: &Token, value: Value) {
         self.fields.borrow_mut().insert(name.get_lexeme(), value);
+    }
+}
+
+impl TryFrom<Value> for Instance {
+    type Error = Error;
+
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::Instance(instance) => Ok(instance),
+            _ => Err(Error::ConversionError {
+                from: value,
+                to: "<instance>".to_string(),
+            }),
+        }
     }
 }
 

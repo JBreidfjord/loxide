@@ -105,6 +105,20 @@ impl Callable for Function {
     }
 }
 
+impl TryFrom<Value> for Function {
+    type Error = Error;
+
+    fn try_from(value: Value) -> Result<Function, Error> {
+        match value {
+            Value::Function(func) => Ok(func),
+            _ => Err(Error::ConversionError {
+                from: value,
+                to: "<fn>".to_string(),
+            }),
+        }
+    }
+}
+
 impl fmt::Debug for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<fn `{}`>", self.declaration.name.get_lexeme())

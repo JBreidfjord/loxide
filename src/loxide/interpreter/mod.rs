@@ -4,7 +4,7 @@ use ordered_float::OrderedFloat;
 use thiserror::Error;
 
 use self::{
-    classes::Class,
+    classes::{Class, Instance},
     environment::Environment,
     functions::{Callable, Function, NativeFunction},
     value::Value,
@@ -477,18 +477,17 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     .lookup_at(*distance, "super".to_string())
                     .expect("Superclass not found in environment");
 
-                let object = self
-                    .environment
-                    .lookup_at(*distance - 1, "this".to_string())
-                    .expect("`this` not found in environment")
-                    .try_into_instance()?;
+                let object = Instance::try_from(
+                    self.environment
+                        .lookup_at(*distance - 1, "this".to_string())
+                        .expect("`this` not found in environment"),
+                )?;
 
-                let super_method = superclass
-                    .clone()
-                    .try_into_class()?
-                    .find_method(&method.get_lexeme());
+                let super_method =
+                    Class::try_from(superclass.clone())?.find_method(&method.get_lexeme());
+
                 if let Some(method) = super_method {
-                    Ok(Value::Function(method.try_into_function()?.bind(object)))
+                    Ok(Value::Function(Function::try_from(method)?.bind(object)))
                 } else {
                     Err(Error::UndefinedProperty {
                         property: method.get_lexeme(),
