@@ -517,6 +517,13 @@ impl Parser {
             TokenType::Number(n) => Ok(Expr::Literal(Literal::Number(n))),
             TokenType::String(s) => Ok(Expr::Literal(Literal::String(s))),
 
+            TokenType::Super => {
+                let keyword = self.previous();
+                self.consume(&TokenType::Dot, "Expect '.' after 'super'.")?;
+                let method = self.consume_identifier("Expect superclass method name.")?;
+                Ok(Expr::Super { keyword, method })
+            }
+
             TokenType::This => Ok(Expr::This(previous)),
 
             TokenType::Identifier(_) => Ok(Expr::Variable(previous)),

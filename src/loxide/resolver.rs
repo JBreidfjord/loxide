@@ -186,6 +186,11 @@ impl Visitor<Result, Result> for Resolver {
                 self.resolve_local(expr, keyword);
                 Ok(())
             }
+
+            Expr::Super { keyword, .. } => {
+                self.resolve_local(expr, keyword);
+                Ok(())
+            }
         }
     }
 
@@ -274,6 +279,13 @@ impl Visitor<Result, Result> for Resolver {
                     }
 
                     self.visit_expr(superclass)?;
+
+                    self.begin_scope(); // Add a scope for the superclass
+                    if let Some(scope) = self.scopes.last_mut() {
+                        scope.insert("super".to_string(), true);
+                    } else {
+                        unreachable!("No scope for superclass");
+                    }
                 }
 
                 // Add a scope for class methods
@@ -294,7 +306,13 @@ impl Visitor<Result, Result> for Resolver {
                     self.resolve_function(method, fn_type)?;
                 }
 
-                self.end_scope();
+                self.end_scope(); // End the scope for class methods
+
+                // End the scope for the superclass
+                if superclass.is_some() {
+                    self.end_scope();
+                }
+
                 self.current_class = enclosing_class;
                 Ok(())
             }

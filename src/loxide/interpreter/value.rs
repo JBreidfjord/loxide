@@ -39,6 +39,36 @@ impl Value {
             Self::Instance(_) => String::from("<instance>"),
         }
     }
+
+    pub fn try_into_class(self) -> Result<Class, Error> {
+        match self {
+            Self::Class(class) => Ok(class),
+            _ => Err(Error::ConversionError {
+                from: self,
+                to: String::from("<class>"),
+            }),
+        }
+    }
+
+    pub fn try_into_function(self) -> Result<Function, Error> {
+        match self {
+            Self::Function(func) => Ok(func),
+            _ => Err(Error::ConversionError {
+                from: self,
+                to: String::from("<fn>"),
+            }),
+        }
+    }
+
+    pub fn try_into_instance(self) -> Result<Instance, Error> {
+        match self {
+            Self::Instance(instance) => Ok(instance),
+            _ => Err(Error::ConversionError {
+                from: self,
+                to: String::from("<instance>"),
+            }),
+        }
+    }
 }
 
 impl TryFrom<&Literal> for Value {

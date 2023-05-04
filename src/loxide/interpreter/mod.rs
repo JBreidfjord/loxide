@@ -75,6 +75,9 @@ pub enum Error {
 
     #[error("Superclass {value} must be a class.")]
     SuperclassNotAClass { value: Value },
+
+    #[error("Failed to convert `{from}` from type `{}` to `{to}`.", .from.type_of())]
+    ConversionError { from: Value, to: String },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -220,6 +223,11 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
                 self.environment.define(name.get_lexeme(), Value::Nil);
 
+                if let Some(superclass) = superclass.clone() {
+                    self.environment = self.environment.nest();
+                    self.environment.define("super".to_string(), *superclass);
+                }
+
                 let mut class_methods = HashMap::new();
                 for method in methods {
                     let function = if method.name.get_lexeme() == "init" {
@@ -235,6 +243,11 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     superclass,
                     methods: class_methods,
                 };
+
+                if class.superclass.is_some() {
+                    self.environment = self.environment.enclosing();
+                }
+
                 self.environment
                     .assign(name.get_lexeme(), Value::Class(class));
             }
@@ -450,6 +463,36 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     Err(Error::PropertyOnNonObject {
                         property: name.get_lexeme(),
                         value: object,
+                    })
+                }
+            }
+
+            Expr::Super { method, .. } => {
+                let distance = self
+                    .locals
+                    .get(expr)
+                    .expect("Super expression not in scope");
+                let superclass = self
+                    .environment
+                    .lookup_at(*distance, "super".to_string())
+                    .expect("Superclass not found in environment");
+
+                let object = self
+                    .environment
+                    .lookup_at(*distance - 1, "this".to_string())
+                    .expect("`this` not found in environment")
+                    .try_into_instance()?;
+
+                let super_method = superclass
+                    .clone()
+                    .try_into_class()?
+                    .find_method(&method.get_lexeme());
+                if let Some(method) = super_method {
+                    Ok(Value::Function(method.try_into_function()?.bind(object)))
+                } else {
+                    Err(Error::UndefinedProperty {
+                        property: method.get_lexeme(),
+                        value: superclass,
                     })
                 }
             }
