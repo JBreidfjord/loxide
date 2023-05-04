@@ -24,6 +24,15 @@ pub enum Error {
 
     #[error("Can't use `this` outside of a class.")]
     ThisOutsideClass,
+
+    #[error("Class {name} can't inherit from itself.")]
+    ClassInheritanceCycle { name: String },
+
+    #[error("Can't use `super` outside of a class.")]
+    SuperOutsideClass,
+
+    #[error("Can't use `super` in a class with no superclass.")]
+    SuperWithoutSuperclass,
 }
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
@@ -36,10 +45,11 @@ enum FnType {
     Initializer,
 }
 
-#[derive(PartialEq, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone, Debug)]
 enum ClassType {
     None,
     Class,
+    Subclass,
 }
 
 pub struct Resolver {
@@ -183,6 +193,17 @@ impl Visitor<Result, Result> for Resolver {
                 self.resolve_local(expr, keyword);
                 Ok(())
             }
+
+            Expr::Super { keyword, .. } => {
+                if self.current_class == ClassType::None {
+                    Err(Error::SuperOutsideClass)
+                } else if self.current_class != ClassType::Subclass {
+                    Err(Error::SuperWithoutSuperclass)
+                } else {
+                    self.resolve_local(expr, keyword);
+                    Ok(())
+                }
+            }
         }
     }
 
@@ -247,12 +268,39 @@ impl Visitor<Result, Result> for Resolver {
 
             Stmt::Break => Ok(()),
 
-            Stmt::Class { name, methods } => {
+            Stmt::Class {
+                name,
+                superclass,
+                methods,
+            } => {
                 let enclosing_class = self.current_class;
                 self.current_class = ClassType::Class;
 
                 self.declare(name)?;
                 self.define(name);
+
+                if let Some(superclass) = superclass {
+                    match superclass {
+                        Expr::Variable(token) => {
+                            if name.get_lexeme() == token.get_lexeme() {
+                                return Err(Error::ClassInheritanceCycle {
+                                    name: name.get_lexeme(),
+                                });
+                            }
+                        }
+                        _ => unreachable!("Superclass should be a variable expression"),
+                    }
+
+                    self.current_class = ClassType::Subclass;
+                    self.visit_expr(superclass)?;
+
+                    self.begin_scope(); // Add a scope for the superclass
+                    if let Some(scope) = self.scopes.last_mut() {
+                        scope.insert("super".to_string(), true);
+                    } else {
+                        unreachable!("No scope for superclass");
+                    }
+                }
 
                 // Add a scope for class methods
                 self.begin_scope();
@@ -272,7 +320,13 @@ impl Visitor<Result, Result> for Resolver {
                     self.resolve_function(method, fn_type)?;
                 }
 
-                self.end_scope();
+                self.end_scope(); // End the scope for class methods
+
+                // End the scope for the superclass
+                if superclass.is_some() {
+                    self.end_scope();
+                }
+
                 self.current_class = enclosing_class;
                 Ok(())
             }

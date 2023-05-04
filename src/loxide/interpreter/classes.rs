@@ -2,17 +2,27 @@ use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 use crate::loxide::token::Token;
 
-use super::{functions::Callable, value::Value, Interpreter, Result};
+use super::{functions::Callable, value::Value, Error, Interpreter, Result};
 
 #[derive(Clone)]
 pub struct Class {
     pub name: String,
+    pub superclass: Option<Box<Value>>,
     pub methods: HashMap<String, Value>,
 }
 
 impl Class {
     pub fn find_method(&self, name: &str) -> Option<Value> {
-        self.methods.get(name).cloned()
+        if let Some(value) = self.methods.get(name) {
+            Some(value.clone())
+        } else if let Some(superclass) = self.superclass.clone() {
+            match *superclass {
+                Value::Class(class) => class.find_method(name),
+                _ => unreachable!("Expected class for superclass"),
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -40,6 +50,20 @@ impl Callable for Class {
         }
 
         Ok(Value::Instance(instance))
+    }
+}
+
+impl TryFrom<Value> for Class {
+    type Error = Error;
+
+    fn try_from(value: Value) -> Result<Class, Error> {
+        match value {
+            Value::Class(class) => Ok(class),
+            _ => Err(Error::ConversionError {
+                from: value,
+                to: "<class>".to_string(),
+            }),
+        }
     }
 }
 
@@ -78,6 +102,20 @@ impl Instance {
 
     pub fn set(&mut self, name: &Token, value: Value) {
         self.fields.borrow_mut().insert(name.get_lexeme(), value);
+    }
+}
+
+impl TryFrom<Value> for Instance {
+    type Error = Error;
+
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::Instance(instance) => Ok(instance),
+            _ => Err(Error::ConversionError {
+                from: value,
+                to: "<instance>".to_string(),
+            }),
+        }
     }
 }
 

@@ -32,7 +32,7 @@ impl Environment {
         Self(Some(Rc::new(scope)))
     }
 
-    fn enclosing(&self) -> Self {
+    pub fn enclosing(&self) -> Self {
         self.0.as_ref().map_or(Self(None), |s| s.enclosing.clone())
     }
 

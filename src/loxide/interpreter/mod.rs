@@ -4,7 +4,7 @@ use ordered_float::OrderedFloat;
 use thiserror::Error;
 
 use self::{
-    classes::Class,
+    classes::{Class, Instance},
     environment::Environment,
     functions::{Callable, Function, NativeFunction},
     value::Value,
@@ -72,6 +72,12 @@ pub enum Error {
 
     #[error("Undefined property `{property}` on object `{value}`.")]
     UndefinedProperty { property: String, value: Value },
+
+    #[error("Superclass {value} must be a class.")]
+    SuperclassNotAClass { value: Value },
+
+    #[error("Failed to convert `{from}` from type `{}` to `{to}`.", .from.type_of())]
+    ConversionError { from: Value, to: String },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -200,8 +206,27 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                 return Err(Error::Return(value));
             }
 
-            Stmt::Class { name, methods } => {
+            Stmt::Class {
+                name,
+                superclass,
+                methods,
+            } => {
+                let superclass = if let Some(superclass) = superclass {
+                    let superclass = self.visit_expr(superclass)?;
+                    match superclass {
+                        Value::Class(class) => Ok(Some(Box::new(Value::Class(class)))),
+                        _ => Err(Error::SuperclassNotAClass { value: superclass }),
+                    }
+                } else {
+                    Ok(None)
+                }?;
+
                 self.environment.define(name.get_lexeme(), Value::Nil);
+
+                if let Some(superclass) = superclass.clone() {
+                    self.environment = self.environment.nest();
+                    self.environment.define("super".to_string(), *superclass);
+                }
 
                 let mut class_methods = HashMap::new();
                 for method in methods {
@@ -215,8 +240,14 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
 
                 let class = Class {
                     name: name.get_lexeme(),
+                    superclass,
                     methods: class_methods,
                 };
+
+                if class.superclass.is_some() {
+                    self.environment = self.environment.enclosing();
+                }
+
                 self.environment
                     .assign(name.get_lexeme(), Value::Class(class));
             }
@@ -432,6 +463,35 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     Err(Error::PropertyOnNonObject {
                         property: name.get_lexeme(),
                         value: object,
+                    })
+                }
+            }
+
+            Expr::Super { method, .. } => {
+                let distance = self
+                    .locals
+                    .get(expr)
+                    .expect("Super expression not in scope");
+                let superclass = self
+                    .environment
+                    .lookup_at(*distance, "super".to_string())
+                    .expect("Superclass not found in environment");
+
+                let object = Instance::try_from(
+                    self.environment
+                        .lookup_at(*distance - 1, "this".to_string())
+                        .expect("`this` not found in environment"),
+                )?;
+
+                let super_method =
+                    Class::try_from(superclass.clone())?.find_method(&method.get_lexeme());
+
+                if let Some(method) = super_method {
+                    Ok(Value::Function(Function::try_from(method)?.bind(object)))
+                } else {
+                    Err(Error::UndefinedProperty {
+                        property: method.get_lexeme(),
+                        value: superclass,
                     })
                 }
             }

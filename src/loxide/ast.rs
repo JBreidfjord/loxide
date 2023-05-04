@@ -43,6 +43,10 @@ pub enum Expr {
         value: Box<Expr>,
     },
     This(Token),
+    Super {
+        keyword: Token,
+        method: Token,
+    },
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -71,6 +75,7 @@ pub enum Stmt {
     },
     Class {
         name: Token,
+        superclass: Option<Expr>,
         methods: Vec<FunctionDeclaration>,
     },
 }
