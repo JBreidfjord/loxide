@@ -27,6 +27,12 @@ pub enum Error {
 
     #[error("Class {name} can't inherit from itself.")]
     ClassInheritanceCycle { name: String },
+
+    #[error("Can't use `super` outside of a class.")]
+    SuperOutsideClass,
+
+    #[error("Can't use `super` in a class with no superclass.")]
+    SuperWithoutSuperclass,
 }
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
@@ -39,10 +45,11 @@ enum FnType {
     Initializer,
 }
 
-#[derive(PartialEq, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone, Debug)]
 enum ClassType {
     None,
     Class,
+    Subclass,
 }
 
 pub struct Resolver {
@@ -188,8 +195,14 @@ impl Visitor<Result, Result> for Resolver {
             }
 
             Expr::Super { keyword, .. } => {
-                self.resolve_local(expr, keyword);
-                Ok(())
+                if self.current_class == ClassType::None {
+                    Err(Error::SuperOutsideClass)
+                } else if self.current_class != ClassType::Subclass {
+                    Err(Error::SuperWithoutSuperclass)
+                } else {
+                    self.resolve_local(expr, keyword);
+                    Ok(())
+                }
             }
         }
     }
@@ -278,6 +291,7 @@ impl Visitor<Result, Result> for Resolver {
                         _ => unreachable!("Superclass should be a variable expression"),
                     }
 
+                    self.current_class = ClassType::Subclass;
                     self.visit_expr(superclass)?;
 
                     self.begin_scope(); // Add a scope for the superclass
