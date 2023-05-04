@@ -34,7 +34,7 @@ impl fmt::Debug for NativeFunction {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct FunctionDeclaration {
     pub name: Token,
     pub params: Vec<Token>,

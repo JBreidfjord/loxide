@@ -89,7 +89,7 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    pub fn new(locals: HashMap<Expr, usize>) -> Self {
+    pub fn new() -> Self {
         let mut globals = Environment::global();
 
         // Define the clock native function
@@ -111,15 +111,12 @@ impl Interpreter {
         Self {
             environment: globals.clone(),
             globals,
-            locals,
+            locals: HashMap::new(),
         }
     }
 
     pub fn interpret(&mut self, statements: &[Stmt]) -> Result<()> {
-        for stmt in statements {
-            self.visit_stmt(stmt)?;
-        }
-        Ok(())
+        statements.iter().try_for_each(|stmt| self.visit_stmt(stmt))
     }
 
     pub fn execute_block(&mut self, statements: &[Stmt], environment: Environment) -> Result<()> {
@@ -145,6 +142,10 @@ impl Interpreter {
         value.ok_or(Error::UndefinedVariable {
             name: name.get_lexeme(),
         })
+    }
+
+    pub fn update_locals(&mut self, locals: HashMap<Expr, usize>) {
+        self.locals.extend(locals);
     }
 }
 
@@ -311,7 +312,7 @@ impl Visitor<Result<Value>, Result<()>> for Interpreter {
                     TokenType::Plus => match (left, right) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
                         (Value::String(l), Value::String(r)) => {
-                            Ok(Value::String(format!("{}{}", l, r)))
+                            Ok(Value::String(format!("{l}{r}")))
                         }
                         (Value::Number(_), right) => {
                             invalid_operand_error(operator, &["Number"], right)

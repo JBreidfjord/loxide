@@ -72,11 +72,11 @@ impl fmt::Display for Value {
             Self::Nil => write!(f, "nil"),
             Self::Bool(b) => b.fmt(f),
             Self::Number(n) => n.fmt(f),
-            Self::String(s) => write!(f, "{}", s),
-            Self::NativeFunction(nf) => write!(f, "{:?}", nf),
-            Self::Function(func) => write!(f, "{:?}", func),
-            Self::Class(class) => write!(f, "{:?}", class),
-            Self::Instance(instance) => write!(f, "{:?}", instance),
+            Self::String(s) => write!(f, "{s}"),
+            Self::NativeFunction(nf) => write!(f, "{nf:?}"),
+            Self::Function(func) => write!(f, "{func:?}"),
+            Self::Class(class) => write!(f, "{class:?}"),
+            Self::Instance(instance) => write!(f, "{instance:?}"),
         }
     }
 }

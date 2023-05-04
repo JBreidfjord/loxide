@@ -107,17 +107,17 @@ impl Parser {
     }
 
     fn function(&mut self, kind: &str) -> Result<FunctionDeclaration> {
-        let name = self.consume_identifier(&format!("Expect {} name.", kind))?;
+        let name = self.consume_identifier(&format!("Expect {kind} name."))?;
         self.consume(
             &TokenType::LeftParen,
-            &format!("Expect '(' after {} name.", kind),
+            &format!("Expect '(' after {kind} name."),
         )?;
 
         let params = self.parameters()?;
 
         self.consume(
             &TokenType::LeftBrace,
-            &format!("Expect '{{' before {} body.", kind),
+            &format!("Expect '{{' before {kind} body."),
         )?;
         let body = self.block()?;
 

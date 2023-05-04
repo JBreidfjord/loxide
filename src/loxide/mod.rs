@@ -14,13 +14,13 @@ mod token_type;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("{}Scanning failed, see errors above.", .0.iter().map(|e| format!("{}\n", e)).collect::<String>())]
+    #[error("{}Scanning failed, see errors above.", .0.iter().map(|e| format!("{e}\n")).collect::<String>())]
     Scanner(Vec<self::scanner::Error>),
 
-    #[error("{}Parsing failed, see errors above.", .0.iter().map(|e| format!("{}\n", e)).collect::<String>())]
+    #[error("{}Parsing failed, see errors above.", .0.iter().map(|e| format!("{e}\n")).collect::<String>())]
     Parser(Vec<self::parser::Error>),
 
-    #[error("{}Variable resolution failed, see errors above.", .0.iter().map(|e| format!("{}\n", e)).collect::<String>())]
+    #[error("{}Variable resolution failed, see errors above.", .0.iter().map(|e| format!("{e}\n")).collect::<String>())]
     Resolver(Vec<self::resolver::Error>),
 
     #[error(transparent)]
@@ -32,11 +32,15 @@ pub enum Error {
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
-pub struct Loxide;
+pub struct Loxide {
+    interpreter: Interpreter,
+}
 
 impl Loxide {
     pub fn new() -> Self {
-        Self
+        Self {
+            interpreter: Interpreter::new(),
+        }
     }
 
     fn run(&mut self, source: Vec<u8>) -> Result {
@@ -47,9 +51,11 @@ impl Loxide {
         let statements = parser.parse().map_err(Error::Parser)?;
 
         let locals = Resolver::new().run(&statements).map_err(Error::Resolver)?;
+        self.interpreter.update_locals(locals);
 
-        let mut interpreter = Interpreter::new(locals);
-        interpreter.interpret(&statements).map_err(Error::Runtime)
+        self.interpreter
+            .interpret(&statements)
+            .map_err(Error::Runtime)
     }
 
     pub fn run_file(&mut self, path: &str) -> Result {
@@ -82,7 +88,7 @@ impl Loxide {
             // Run the line
             match self.run(buffer.into_bytes()) {
                 Ok(_) => {}
-                Err(e) => println!("{}", e),
+                Err(e) => println!("{e}"),
             }
 
             // Flush stdout

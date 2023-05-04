@@ -4,8 +4,10 @@ use super::value::Value;
 
 // Cactus stack / parent-pointer tree
 // Based on https://stackoverflow.com/a/48298865
+#[derive(Debug)]
 pub struct Environment(Option<Rc<Scope>>);
 
+#[derive(Debug)]
 struct Scope {
     variables: RefCell<HashMap<String, Value>>,
     enclosing: Environment,

@@ -9,7 +9,7 @@ fn main() {
         1 => loxide.run_repl().unwrap(),
         2 => {
             if let Err(e) = loxide.run_file(&args[1]) {
-                println!("{}", e);
+                println!("{e}");
                 std::process::exit(match e {
                     Error::Runtime(_) => 70,
                     Error::Io(_) => 74,

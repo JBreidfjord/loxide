@@ -4,7 +4,7 @@ use ordered_float::OrderedFloat;
 
 use super::{interpreter::functions::FunctionDeclaration, token::Token};
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Expr {
     Binary {
         left: Box<Expr>,
@@ -49,7 +49,7 @@ pub enum Expr {
     },
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
@@ -97,9 +97,9 @@ impl fmt::Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Literal::Nil => write!(f, "nil"),
-            Literal::Bool(v) => write!(f, "{}", v),
-            Literal::Number(v) => write!(f, "{}", v),
-            Literal::String(v) => write!(f, "{}", v),
+            Literal::Bool(b) => write!(f, "{b}"),
+            Literal::Number(n) => write!(f, "{n}"),
+            Literal::String(s) => write!(f, "{s}"),
         }
     }
 }
